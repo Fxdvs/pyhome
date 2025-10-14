@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-py led.py
+py - app.py
 pause

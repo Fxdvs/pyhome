@@ -3,16 +3,17 @@ import socket
 import threading
 import os
 from time import sleep
-from utils.colors import GREEN, RED, RESET
+from utils.colors import GREEN, RED, GRAY, RESET
 from utils.check_connection import is_connected
 from utils.commands import commands
 
 NAME = "Hub"
 VERSION = "0.1"
-HOST = '0.0.0.0'  
-PORT = 5555      
+HOST = "0.0.0.0"
+PORT = 5555
 
 os.system('color')
+os.system(f"title {NAME} {VERSION}")
 
 # global array of connected clients
 connected_clients = {}
@@ -20,7 +21,6 @@ clients_lock = threading.Lock()
 
 def handle_client(conn, addr):
     # Handles client connection
-    module_name = None
     try:
         # Receive module name
         client_name = conn.recv(1024).decode('utf-8')
@@ -28,7 +28,9 @@ def handle_client(conn, addr):
             return
         with clients_lock:
             connected_clients[addr] = client_name
-        print(f"\nClient connected: {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET}")
+        save_client(addr, client_name)
+        print(f"\nClient connected: {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET}")       
+        # Send server info to client
         server_info = {
             "name": NAME,
             "version": VERSION,
@@ -36,6 +38,7 @@ def handle_client(conn, addr):
             "port": PORT
         }
         conn.send(json.dumps(server_info).encode('utf-8'))
+        
         # Keep connection alive
         while True:
             try:
@@ -56,7 +59,20 @@ def handle_client(conn, addr):
             if addr in connected_clients:
                 print(f"Client disconnected: {RED}{addr[0]}:{addr[1]}@{connected_clients[addr]}{RESET}")
                 del connected_clients[addr]
+        
         conn.close()
+
+def save_client(addr, client_name):
+    client_key = f"{addr[0]}:{addr[1]}@{client_name}"
+    
+    if os.path.exists("clients.txt"):
+        with open("clients.txt", "r") as f:
+            for line in f:
+                if line.strip() == client_key:
+                    return 
+    
+    with open("clients.txt", "a") as f:
+        f.write(f"{client_key}\n")
 
 # main server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -70,14 +86,30 @@ def command_handler():
     while True:
         match input("> ").strip().lower():
             case "list":
-                with clients_lock:
-                    if connected_clients:
-                        print("\n" + " " * 5 + "List of connected clients")
-                        for i, (client_addr,client_name) in enumerate(connected_clients.items(), 1):
-                            print(" " * 5 + f"#{i} {GREEN}{client_addr[0]}:{client_addr[1]}@{client_name}{RESET}")
-                        print()
-                    else:
-                        print("No connected clients\n")
+                print("\n" + " " * 5 + "Connected clients")
+                
+                # Čítaj všetkých klientov zo súboru
+                if os.path.exists("clients.txt"):
+                    with open("clients.txt", "r") as f:
+                        for line in f:
+                            client_info = line.strip()
+                            if client_info and "No connected clients" not in client_info:
+                                # Skontroluj či je online
+                                is_online = False
+                                with clients_lock:
+                                    for addr, name in connected_clients.items():
+                                        if f"{addr[0]}:{addr[1]}@{name}" == client_info:
+                                            is_online = True
+                                            break
+                                # Vypíš s farbou
+                                if is_online:
+                                    print(" " * 5 + f"{GREEN}{client_info}{RESET}")
+                                else:
+                                    print(" " * 5 + f"{GRAY}{client_info}{RESET}")
+                else:
+                    print(" " * 5 + "No clients found")
+                print()
+                
             case "clear" | "cls":
                 os.system('cls' if os.name == 'nt' else 'clear')
             case "exit":
@@ -87,16 +119,17 @@ def command_handler():
             case "help" | "commands" | "?":
                 print("\n" + " " * 5 + "List of Commands") 
                 for cmd in commands:
-                    print(" " * 5 + f"{cmd['name']} - {cmd['description']}  ")
+                    print(" " * 5 + f"{cmd['name']} - {cmd['description']}")
+                print()
             case "info" | "self" | "about":
                 internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
-                print("\n" + " " * 5 + f"Information")
+                print("\n" + " " * 5 + "Information")
                 print(" " * 5 + f"Name: {NAME}") 
                 print(" " * 5 + f"Host: {HOST}")
                 print(" " * 5 + f"Port: {PORT}")
                 print(" " * 5 + f"Version: {VERSION}")
                 print(" " * 5 + f"Connected: {internet_status}")
-                print(" " * 5 + f"Connected clients: {len(connected_clients)}")
+                print(" " * 5 + f"Connected clients: {len(connected_clients)}\n")
             case "":
                 pass
             case _:
