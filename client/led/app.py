@@ -1,11 +1,13 @@
 import json
 import os
+import sys
 import random
 import socket
 import time
 import threading
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.commands import commands
-from utils.colors import GREEN, RED, YELLOW, RESET
+from utils.colors import GREEN, RED, RESET
 
 NAME = "LED"
 VERSION = "0.1"
