@@ -2,15 +2,15 @@ import json
 import threading
 import socket
 import os
-import shutil
+from datetime import datetime
 
 from time import sleep
 from utils import GREEN, RED, GRAY, RESET, is_connected, commands
-from config import ID, NAME, VERSION, HOST, PORT, handle_name
+from config import ID, NAME, VERSION, HOST, PORT, handle_name_edit
 
 # init
 os.system("color")
-os.system(f"title {NAME} {VERSION}")
+os.system(f"title {NAME}#{ID} {VERSION}")
 
 # global variables
 connected_clients = {}
@@ -34,7 +34,6 @@ def handle_client(conn, addr):
         # prepare server information
         server_info = {"name": NAME, "version": VERSION, "host": HOST, "port": PORT}
         conn.send(json.dumps(server_info).encode("utf-8"))
-
         # keep connection and receive messages
         while True:
             try:
@@ -45,7 +44,6 @@ def handle_client(conn, addr):
 
                 message = data.decode("utf-8")
                 print(f"from {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET} {message}")
-
             except socket.timeout:
                 continue
             except Exception as e:
@@ -78,7 +76,6 @@ def save_client(addr, client_name):
     # append new client to file
     with open("clients.txt", "a") as f:
         f.write(f"{client_key}\n")
-
 # server
 def start_server():
     # init and start server socket
@@ -90,10 +87,42 @@ def start_server():
 
     return server_socket
 
-# client list - list
-def display_clients_list():
+# clear list | clear ls
+def clear_list():
+    # clear clients list
+    if os.path.exists("clients.txt"):
+        os.remove("clients.txt")
+        print("clients.txt clear successful.")
+
+# config load / conf load
+def config_load():
+    print("Do you want to load the config file? (y/n)")
+    accept = input("> ").strip().lower()
+    if accept == "y":
+        internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
+        gap = 80
+        try:
+            from config import ID, NAME, TYPE, VERSION, HOST, PORT
+            os.system(f"title {NAME}#{ID} {VERSION}")
+            print("\n" + " " * 5 + f"{NAME}") 
+            print(" " * 5 + f"{GRAY}{'─' * gap}{RESET} ")
+            print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
+            print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
+            print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
+            print(" " * 5 + f"{'Version:'.ljust(gap-len(VERSION))}{VERSION}")
+            print(" " * 5 + f"{'Host/Adress:'.ljust(gap-len(HOST))}{HOST}")
+            print(" " * 5 + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
+        except Exception as e:
+            print(f"Error loading config: {e}")
+        print(" " * 5 + f"{'Connected:'.ljust(gap-len(str(is_connected())))}{internet_status}")
+        print(" " * 5 + f"{'Connected clients:'.ljust(gap-len(str(len(connected_clients))))}{len(connected_clients)}\n")
+    else:
+        pass
+# list | l
+def list():
     # display connected clients
-    print("\n" + " " * 5 + "List of clients")
+    print("\n" + " " * 5 + "List of connected clients:")
+    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
     if not os.path.exists("clients.txt"):
         print(" " * 5 + "No clients found")
         return
@@ -119,9 +148,76 @@ def display_clients_list():
             client_id += 1
     if not clients_found:
         print(" " * 5 + "No clients found")
+    print("")
+
+# self | about
+def self():
+    internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
+    time = datetime.now().strftime("[%Y:%d:%m:%H:%M:%S]")
+    gap = 50
+    try:
+        from config import ID, NAME, TYPE, VERSION, HOST, PORT
+        print("\n" + " " * 5 + f"{NAME.ljust(gap-len(str(time)))}{time}") 
+        print(" " * 5 + f"{GRAY}{'─' * 50}{RESET} ")
+        print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
+        print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
+        print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
+        print(" " * 5 + f"{'Version:'.ljust(gap-len(VERSION))}{VERSION}")
+        print(" " * 5 + f"{'Host/Adress:'.ljust(gap-len(HOST))}{HOST}")
+        print(" " * 5 + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
+    except Exception as e:
+        print(f"Error loading config: {e}")
+    print(" " * 5 + f"{'Connected:'.ljust(gap-len(str(is_connected())))}{internet_status}")
     
-    print()
-# send message - send
+    print(" " * 5 + f"{'Connected clients:'.ljust(gap-len(str(len(connected_clients))))}{len(connected_clients)}\n")
+
+# name edit
+def name_edit():
+    print("\n" + " " * 5 + "Edit name")
+    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+    try:
+        from config import NAME, TYPE
+        print(" " * 5 + f"Type: {TYPE}")
+        print(" " * 5 + f"From: {GRAY}{NAME}{RESET}\n")
+    except Exception as e:
+        print(f"Error loading config: {e}")
+    new_name = input(">: ").strip().lower()
+    if new_name != "":
+        print("\n" + " " * 5 + "Edit server name")
+        print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+        print(" " * 5 + f"Type: {TYPE}")
+        print(" " * 5 + f"From: {GRAY}{NAME}{RESET}")
+        print(" " * 5 + f"To: {GREEN}{new_name}{RESET}\n")
+        print(f"Change from {NAME} to {new_name}? (y/n) ")
+        accept = input(f">").strip().lower()
+        if accept == "y":
+            handle_name_edit(new_name)
+        else:
+            return 
+        try:
+            from config import NAME, ID, VERSION
+            os.system(f"title {NAME}#{ID} {VERSION}")
+        except Exception as e:
+            print(f"Error updating name: {e}")
+    print("")
+
+# restart
+def restart_server():
+    print("Are you sure you want to restart the server? (y/n)")
+    accept = input(">").strip().lower()
+    if accept == "y":
+        os.system("cls")
+        print("\n" + " " * 5 + "Server restarting...")
+        print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+        for i in range(1,6):
+            print(" " * 5 + f"Restarting in {RED}{i}{RESET} seconds")
+            sleep(1)
+        os.system("cls")
+        os.system("py app.py")
+    else:
+        return
+    
+# send
 def send_message_to_client():
     # send message to client
     print("\n" + " " * 5 + "Available clients:")
@@ -175,34 +271,6 @@ def send_message_to_client():
 
     print("Client not found or not connected")
 
-# edit name - name
-def edit_server_name():
-    cmd = input("> (new name) ").strip().lower()
-    if cmd != "":
-        handle_name(cmd)
-        try:
-            from config import NAME, VERSION
-
-            os.system(f"title {NAME} {VERSION}")
-        except Exception as e:
-            print(f"Error updating name: {e}")
-    print("")
-
-# info - about | info | self
-def info():
-    internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
-    try:
-        from config import ID, NAME, VERSION, HOST, PORT
-        print("\n" + " " * 5 + f"{NAME}#{ID}")
-        print(" " * 5 + f"Name: {NAME}")
-        print(" " * 5 + f"Version: {VERSION}")
-        print(" " * 5 + f"Host: {HOST}")
-        print(" " * 5 + f"Port: {PORT}")
-    except Exception as e:
-        print(f"Error updating name: {e}")
-    print(" " * 5 + f"Connected: {internet_status}")
-    print(" " * 5 + f"Connected clients: {len(connected_clients)}\n")
-
 # command handler
 def command_handler():
     # handles commands
@@ -210,31 +278,42 @@ def command_handler():
         try:
             cmd = input("> ").strip().lower()
             match cmd:
-                case "list":
-                    display_clients_list()
                 case "clear" | "cls":
                     os.system("cls" if os.name == "nt" else "clear")
-                case "exit":
-                    print(f"{RED}{NAME} is shutting down.{RESET}")
-                    sleep(1)
-                    exit(0)
+                    continue
+                case "clear list" | "clear ls":
+                    accept = input("Are you sure you want to clear the client list? (y/n) ").strip().lower()
+                    if accept == "y":
+                        clear_list()
+                    else:
+                        print("Clear cancelled.")
+                case "config load" | "conf load":
+                    config_load()
+                case "exit" | "quit":
+                    print(f"> {RED}{NAME}#{ID}{RESET} is shutting down.")
+                    exit(0)      
                 case "help" | "commands" | "?":
-                    print("\n" + " " * 5 + "List of Commands")
+                    print("\n" + " " * 5 + f"{'Name of Command'.ljust(45)}Description", end="")
+                    print("\n" + " " * 5 + f"{GRAY}─{RESET}" * 90)
+
                     for command in commands:
-                        print(" " * 5 + f"{command['name']} - {command['description']}")
+                        if command["type"] == "server" or command["type"] == "client/server":
+                            print(" " * 5 + f"{command['name'].ljust(45)}{command['description']}")
                     print()
-                case "info" | "self" | "about":
-                    info()
+                case "list" | "ls":
+                    list()
+                case "self" | "about":
+                    self()
+                case "name edit":
+                    name_edit()
+                case "restart":
+                    restart_server()
                 case "send":
                     send_message_to_client()
-                case "name":
-                    edit_server_name()
                 case "":
                     continue
                 case _:
-                    print(
-                        "Unknown command. Type 'help | commands | ?' for list of commands."
-                    )
+                    print("Unknown command. Type 'help | commands | ?' for list of commands.")
 
         except Exception as e:
             print(f"Error in command handler: {e}")
@@ -246,7 +325,7 @@ if __name__ == "__main__":
     server_cmd_thread.daemon = True
     server_cmd_thread.start()
 
-    # Start server socket
+    # start server socket
     server_socket = start_server()
     try:
         # accept and handle client connections
