@@ -176,7 +176,7 @@ def send_message_to_client():
     print("Client not found or not connected")
 
 # edit name - name
-def edit_client_name():
+def edit_server_name():
     cmd = input("> (new name) ").strip().lower()
     if cmd != "":
         handle_name(cmd)
@@ -228,7 +228,7 @@ def command_handler():
                 case "send":
                     send_message_to_client()
                 case "name":
-                    edit_client_name()
+                    edit_server_name()
                 case "":
                     continue
                 case _:
@@ -238,7 +238,6 @@ def command_handler():
 
         except Exception as e:
             print(f"Error in command handler: {e}")
-
 
 # main
 if __name__ == "__main__":
