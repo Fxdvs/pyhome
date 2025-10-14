@@ -1,17 +1,11 @@
 import json
-import socket
 import threading
+import socket
 import os
 from time import sleep
-from utils.colors import GREEN, RED, GRAY, RESET
-from utils.check_connection import is_connected
-from utils.commands import commands
-
-NAME = "Hub"
+from utils import GREEN, RED, GRAY, RESET, is_connected, commands
+from config import NAME, HOST, PORT
 VERSION = "0.1"
-HOST = "0.0.0.0"
-PORT = 5555
-
 os.system('color')
 os.system(f"title {NAME} {VERSION}")
 
@@ -20,9 +14,9 @@ connected_clients = {}
 clients_lock = threading.Lock()
 
 def handle_client(conn, addr):
-    # Handles client connection
+    # client connection
     try:
-        # Receive module name
+        # receive client name
         client_name = conn.recv(1024).decode('utf-8')
         if not client_name:
             return
@@ -30,7 +24,7 @@ def handle_client(conn, addr):
             connected_clients[addr] = client_name
         save_client(addr, client_name)
         print(f"\nClient connected: {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET}")       
-        # Send server info to client
+        # send server info
         server_info = {
             "name": NAME,
             "version": VERSION,
@@ -39,7 +33,7 @@ def handle_client(conn, addr):
         }
         conn.send(json.dumps(server_info).encode('utf-8'))
         
-        # Keep connection alive
+        # keep connection
         while True:
             try:
                 conn.settimeout(5)
@@ -82,26 +76,26 @@ server_socket.listen(5)
 print(f"{NAME} is running on {HOST}:{PORT}")
 
 def command_handler():
-    # Command handler
+    # command handler
     while True:
         match input("> ").strip().lower():
             case "list":
                 print("\n" + " " * 5 + "Connected clients")
                 
-                # Čítaj všetkých klientov zo súboru
+                # read all clients
                 if os.path.exists("clients.txt"):
                     with open("clients.txt", "r") as f:
                         for line in f:
                             client_info = line.strip()
                             if client_info and "No connected clients" not in client_info:
-                                # Skontroluj či je online
+                                # check if online
                                 is_online = False
                                 with clients_lock:
                                     for addr, name in connected_clients.items():
                                         if f"{addr[0]}:{addr[1]}@{name}" == client_info:
                                             is_online = True
                                             break
-                                # Vypíš s farbou
+                                # print with color
                                 if is_online:
                                     print(" " * 5 + f"{GREEN}{client_info}{RESET}")
                                 else:
@@ -135,7 +129,7 @@ def command_handler():
             case _:
                 print(f"Unknown command. Type 'help | commands | ?' for list of commands.\n")
 
-# Start server command thread
+# start server command thread
 server_cmd_thread = threading.Thread(target=command_handler)
 server_cmd_thread.daemon = True
 server_cmd_thread.start()
@@ -143,7 +137,7 @@ server_cmd_thread.start()
 try:
     while True:
         conn, addr = server_socket.accept()
-        # Start new thread for each client
+        # start new thread for each client
         client_thread = threading.Thread(target=handle_client, args=(conn, addr))
         client_thread.daemon = True
         client_thread.start()
