@@ -80,7 +80,7 @@ server_socket.bind((HOST, PORT))
 server_socket.listen(5)
 print(f"{NAME} is running on {HOST}:{PORT}")
 
-def commands():
+def command_handler():
     while True:
             match input("> ").strip().lower():
                 case "list":
@@ -174,10 +174,6 @@ def commands():
                         print(" " * 5 + "No clients found\n")
                 case _:
                     print("Unknown command. Type 'help | commands | ?' for list of commands.")
-
-
-def command_handler():
-    commands()
     
 
 # start server command thread

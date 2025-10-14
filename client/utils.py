@@ -15,4 +15,5 @@ from commands import commands # type: ignore
 from check_connection import is_connected  # type: ignore
 
 # expose everything from this local utils.py
-__all__ = ["GREEN", "RED", "GRAY", "RESET", "commands", "is_connected"]
+__all__ = ["GREEN", "RED", "RESET", "commands"]
+ 

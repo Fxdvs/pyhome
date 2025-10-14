@@ -72,18 +72,22 @@ def connect_to_server():
 def receive_messages():
     global CONNECTED, s
     while True:
+        with connection_lock:
+            if not CONNECTED or s is None:
+                time.sleep(0.1)
+                continue
+            sock = s
+
         try:
-            with connection_lock:
-                if not CONNECTED or s is None:
-                    continue
-            s.settimeout(1)
+            sock.settimeout(1)
             try:
-                data = s.recv(1024).decode('utf-8')
+                data = sock.recv(1024)
                 if data:
+                    data = data.decode('utf-8')
                     print(f"from {GREEN}{server_info['host']}:{server_info['port']}@{server_info['name']}{RESET} {data}")
             except socket.timeout:
                 pass
-            except ConnectionResetError:
+            except (ConnectionResetError, ConnectionAbortedError):
                 with connection_lock:
                     CONNECTED = False
                 print(f"{RED}Disconnected from server.{RESET}")
@@ -92,6 +96,7 @@ def receive_messages():
                 CONNECTED = False
             print(f"Error receiving data: {e}")
             time.sleep(1)
+
             
 def commands():
     match input("> ").strip().lower():
@@ -151,11 +156,8 @@ def commands():
             print("Color disabled.")
         case "color":
             print("To enable color, type 'color enable'. To disable color, type 'color disable'.")
-        case "":
-            pass
         case _:
-            if cmd:
-                s.send(cmd.encode('utf-8'))
+            print("Unknown command. Type 'help | commands | ?' for list of commands.")
 
 def command_handler():
     global s, CONNECTED, auto_reconnect
