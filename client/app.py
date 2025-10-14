@@ -83,7 +83,8 @@ def receive_messages():
             
             try:
                 sock.settimeout(0.5)
-                data = sock.recv(1024)                
+                data = sock.recv(1024)
+                
                 if data:
                     message = data.decode('utf-8')
                     print(f"from {GREEN}{server_info['host']}:{server_info['port']}@{server_info['name']}{RESET} {message}")

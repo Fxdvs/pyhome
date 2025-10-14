@@ -26,7 +26,7 @@ def handle_client(conn, addr):
         with clients_lock:
             connected_clients[addr] = client_name
         save_client(addr, client_name)
-        print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET}")       
+        print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name} {RESET} ")       
         # send server info
         server_info = {
             "name": NAME,
@@ -48,7 +48,7 @@ def handle_client(conn, addr):
             except socket.timeout:
                 continue
             except Exception as e:
-                print(f"Error with {client_name}: {e}")
+                # print(f"Error with {client_name}: {e}") Error line
                 break
     except Exception as e:
         print(f"{RED}Fatal error {addr}: {e}{RESET}")
