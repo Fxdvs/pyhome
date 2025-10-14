@@ -5,11 +5,8 @@ import socket
 import time
 import threading
 from utils import GREEN, RED, RESET, commands
-
-NAME = "client"
-VERSION = "0.3 "
-HOST = '127.0.0.1'
-PORT = 5555
+from config import NAME, HOST, PORT
+VERSION = "0.3"
 
 CONNECTED = False
 s = None
@@ -39,7 +36,6 @@ def connect_to_server():
                     print(
                         f"\nConnected to {GREEN}{server_info['host']}:{server_info['port']}@{server_info['name']}{RESET}")
                     auto_reconnect = False
-
             # Wait for command with timeout
             if CONNECTED:
                 s.settimeout(1)

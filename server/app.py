@@ -135,7 +135,7 @@ def command_handler():
                 case "color":
                     print("To enable color, type 'color enable'. To disable color, type 'color disable'.")
                 case "send":
-                    print("\n" + " " * 5 + "Select a client (q for quit) (port only) (must be connected)")
+                    print("\n" + " " * 5 + "Clients")
                     # read all clients
                     if os.path.exists("clients.txt"):
                         with open("clients.txt", "r") as f:
