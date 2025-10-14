@@ -17,12 +17,12 @@ server_info = {}
 connection_lock = threading.Lock()
 auto_reconnect = False
 
-os.system('color')
+global color_status 
+color_status = os.system('color')
+
 os.system(f"title {NAME} {VERSION}")
 
-
 def connect_to_server():
-    
     global CONNECTED, s, server_info, auto_reconnect
     while True:
         try:
@@ -143,6 +143,14 @@ def commands():
                 s.send(cmd.encode('utf-8'))
             else: 
                 print("Error sending message")
+        case "color enable":
+            color_status = os.system('color')
+            print("Color restored.")
+        case "color disable":
+            color_status = os.system('color 0')
+            print("Color disabled.")
+        case "color":
+            print("To enable color, type 'color enable'. To disable color, type 'color disable'.")
         case "":
             pass
         case _:

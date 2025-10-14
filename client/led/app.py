@@ -6,7 +6,7 @@ import time
 import threading
 from utils import GREEN, RED, RESET, commands
 
-NAME = "LED"
+NAME = "led"
 VERSION = "0.1"
 HOST = '127.0.0.1'
 PORT = 5555
@@ -18,7 +18,7 @@ connection_lock = threading.Lock()
 auto_reconnect = False
 
 os.system('color')
-os.system(f"title {NAME}")
+os.system(f"title {NAME} {VERSION}")
 
 
 def connect_to_server():
