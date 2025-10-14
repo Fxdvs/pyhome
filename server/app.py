@@ -58,7 +58,6 @@ def handle_client(conn, addr):
             if addr in connected_clients:
                 print(f"Client disconnected {RED}{addr[0]}:{addr[1]}@{connected_clients[addr]}{RESET}")
                 del connected_clients[addr]
-        
         conn.close()
 
 def save_client(addr, client_name):
