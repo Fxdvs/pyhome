@@ -7,7 +7,5 @@ commands = [
     {'name': 'reconnect', 'description': 'Reconnect to server. '},
     {'name': 'disconnect', 'description': 'Disconnect from server.'},
     {'name': 'send <message> <server/client> (host:port@name)', 'description': 'Sends message to server/client.'},
-    {'name': 'broadcast <message>', 'description': 'Broadcasts message to all connected clients.'},
-    {'name': 'color <enable/disable> (default on)', 'description': 'Enables colorful output.'},
-    
+    {'name': 'name', 'description': 'Changes name of the device.'},
 ]
