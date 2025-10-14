@@ -1,0 +1,7 @@
+{
+    "ID": "sys-server-main",
+    "NAME": "server",
+    "VERSION": "0.4",
+    "HOST": "0.0.0.0",
+    "PORT": 5555
+}
