@@ -1,3 +1,3 @@
-NAME = "Hub"
+NAME = "server"
 HOST = "0.0.0.0"
 PORT = 5555
