@@ -1,7 +1,10 @@
 @echo off
-cd /d "%~dp0"
+REM server
+start "Server" cmd /k "cd /d %~dp0server && start.bat"
 
-start "server" py server/app.py
-start "client" py client/app.py
+REM client
+start "Client" cmd /k "cd /d %~dp0client && start.bat"
 
-pause
+echo All instances started.
+timeout /t 1 >nul
+
