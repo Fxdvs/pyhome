@@ -2,7 +2,7 @@
     "ID": "1",
     "NAME": "server",
     "TYPE": "sys-server",
-    "VERSION": "0.5.2",
+    "VERSION": "0.6",
     "HOST": "0.0.0.0",
     "PORT": 5555
 }
