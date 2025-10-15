@@ -6,11 +6,11 @@ from datetime import datetime
 
 from time import sleep
 from utils import GREEN, RED, GRAY, RESET, is_connected, commands
-from config import ID, NAME, VERSION, HOST, PORT, handle_name_edit
+from config import ID, NAME, TYPE, VERSION, HOST, PORT, handle_name_edit
 
 # init
 os.system("color")
-os.system(f"title {NAME}@{ID} {VERSION}")
+os.system(f"title {NAME}#{ID} {VERSION}")
 
 # global variables
 connected_clients = {}
@@ -38,15 +38,20 @@ def handle_client(conn, addr):
         
         # Store client in global dictionary
         with clients_lock:
-            connected_clients[addr] = {"name": client_name, "id": client_id}
+            connected_clients[addr] = {
+                "name": client_name, 
+                "id": client_id, 
+                "socket": conn,
+            }
         
         # Save client to persistent storage
         save_client(addr, client_name, client_id)
         print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}")
-        # Prepare server information
+        # Prepare server information    
         server_info = {
             "id": ID,
             "name": NAME,
+            "type": TYPE,
             "version": VERSION,
             "host": HOST,
             "port": PORT
@@ -59,10 +64,8 @@ def handle_client(conn, addr):
                 data = conn.recv(1024)
                 if not data:
                     break
-                
                 message = data.decode('utf-8')
-                print(f"from {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET} {message}")
-                
+                print(f"From {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")  
             except socket.timeout:
                 continue
             except Exception as e:
@@ -93,6 +96,7 @@ def save_client(addr, client_name, client_id):
     # Append new client to file
     with open("clients.txt", "a") as f:
         f.write(f"{client_key}\n")
+
 # server
 def start_server():
     # init and start server socket
@@ -100,7 +104,7 @@ def start_server():
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((HOST, PORT))
     server_socket.listen(5)
-    print(f"{NAME}@{ID} is running on {HOST}:{PORT}@{NAME}")
+    print(f"{NAME}#{ID} is running on {GREEN}{HOST}:{PORT}{RESET}")
 
     return server_socket
 
@@ -133,31 +137,47 @@ def show_config():
 # list | ls
 def list():
     # display connected clients
-    print("\n" + " " * 5 + "List of connected clients:")
+    print("\n" + " " * 5 + "List of connected clients")
     print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
     if not os.path.exists("clients.txt"):
         print(" " * 5 + "No clients found")
+        print("")
         return
+    
     client_id = 1
     clients_found = False
+    
     with open("clients.txt", "r") as f:
         for line in f:
             client_info = line.strip()
             if not client_info or "No connected clients" in client_info:
                 continue
+            
             clients_found = True
-            # check client if is online
+            
+            # Check if client is online
             is_online = False
             with clients_lock:
-                for addr, name in connected_clients.items():
-                    if f"{addr[0]}:{addr[1]}@{name}" == client_info:
+                for addr, client_data in connected_clients.items():
+                    # Support both old (string) and new (dict) format
+                    if isinstance(client_data, dict):
+                        client_name = client_data.get("name", "")
+                        client_id_val = client_data.get("id", "")
+                        online_key = f"{addr[0]}:{addr[1]}@{client_name}#{client_id_val}"
+                    else:
+                        online_key = f"{addr[0]}:{addr[1]}@{client_data}"
+                    
+                    if online_key in client_info or client_info.startswith(f"{addr[0]}:{addr[1]}@"):
                         is_online = True
                         break
+            
             if is_online:
                 print(" " * 5 + f"#{client_id} {GREEN}{client_info}{RESET}")
             else:
                 print(" " * 5 + f"#{client_id} {GRAY}{client_info}{RESET}")
+            
             client_id += 1
+    
     if not clients_found:
         print(" " * 5 + "No clients found")
     print("")
@@ -165,53 +185,68 @@ def list():
 # list -b | ls -b
 def list_b():
     # display connected clients in columns
-    print("\n" + " " * 5 + "List of connected clients:")
+    print("\n" + " " * 5 + "List of connected clients")
     print(" " * 5 + f"{GRAY}{'─' * 120}{RESET}")
-
+    
     if not os.path.exists("clients.txt"):
-        print(" " * 5 + "No clients found")
+        print(" " * 5 + "No clients found\n")
         return
+    
     clients = []
+    
     with open("clients.txt", "r") as f:
         for line in f:
             client_info = line.strip()
             if not client_info or "No connected clients" in client_info:
                 continue
-            # check if client is online
+            
+            # Check if client is online
             is_online = False
             with clients_lock:
-                for addr, name in connected_clients.items():
-                    if f"{addr[0]}:{addr[1]}@{name}" == client_info:
+                for addr, client_data in connected_clients.items():
+                    # Support both old (string) and new (dict) format
+                    if isinstance(client_data, dict):
+                        client_name = client_data.get("name", "")
+                        client_id_val = client_data.get("id", "")
+                        online_key = f"{addr[0]}:{addr[1]}@{client_name}#{client_id_val}"
+                    else:
+                        online_key = f"{addr[0]}:{addr[1]}@{client_data}"
+                    
+                    if online_key in client_info or client_info.startswith(f"{addr[0]}:{addr[1]}@"):
                         is_online = True
                         break
+            
             color = GREEN if is_online else GRAY
             clients.append(f"{color}{client_info}{RESET}")
+    
     if not clients:
-        print(" " * 5 + "No clients found")
+        print(" " * 5 + "No clients found\n")
         return
-    # 5 cols, clients per col 25, 
+    
+    # 5 cols, 25 clients per col
     max_per_column = 25
     num_columns = 5
     columns = [clients[i:i + max_per_column] for i in range(0, len(clients), max_per_column)]
-
-    # same height for all columns
-    max_height = max(len(col) for col in columns)
+    
+    # Same height for all columns
+    max_height = max(len(col) for col in columns) if columns else 0
     for col in columns:
         while len(col) < max_height:
             col.append("")
-
-    # width of each column
-    col_width = max(len(c.replace(GREEN, "").replace(GRAY, "").replace(RESET, "")) for c in clients) + 10
-
-    # print by rows
+    
+    # Width of each column
+    col_width = max(len(c.replace(GREEN, "").replace(GRAY, "").replace(RESET, "")) for c in clients) + 10 if clients else 30
+    
+    # Print by rows
     for row in range(max_height):
         row_str = " " * 5
         for col_idx, col in enumerate(columns):
-            if row < len(col):
+            if row < len(col) and col[row]:
                 client_id = row + 1 + (col_idx * max_per_column)
                 entry = f"#{client_id:<3} {col[row]:<{col_width}}"
                 row_str += entry
         print(row_str.rstrip())
+    
     print("")
 
 # self | about
@@ -219,12 +254,10 @@ def self():
     internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
     time = datetime.now().strftime("[%Y:%d:%m:%H:%M:%S]")
     gap = 70
-    
     try:
         from config import ID, NAME, TYPE, VERSION, HOST, PORT
-        name = f"{NAME}@{ID}"
-        print("")
-        print(" " * 5 + f"{name.ljust(gap - len(time))}{time}")
+        name = f"{NAME}#{ID}"
+        print("\n" + " " * 5 + f"{name.ljust(gap - len(time))}{time}")
         print(" " * 5 + f"{GRAY}{'─' * gap}{RESET} ")
         print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
         print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
@@ -235,11 +268,10 @@ def self():
     except Exception as e:
         print(f"Error loading config: {e}")
     print(" " * 5 + f"{'Connected:'.ljust(gap-len(str(is_connected())))}{internet_status}")
-    
     print(" " * 5 + f"{'Connected clients:'.ljust(gap-len(str(len(connected_clients))))}{len(connected_clients)}\n")
 
-# name edit
-def name_edit():
+# edit name
+def edit_name():
     gap = 50
     print("\n" + " " * 5 + "Edit name")
     print(" " * 5 + f"{GRAY}{'─' * gap}{RESET}")
@@ -263,14 +295,14 @@ def name_edit():
         print(" " * 5 + f"{prompt.ljust(gap)}")  # zarovnanie promptu do gap
         accept = input(f">").strip().lower()
         if accept == "y":
-            handle_name_edit(new_name)
+            handle_edit_name(new_name)
         else:
             return 
         
         # aktualizácia názvu v okne
         try:
             from config import NAME, ID, VERSION
-            os.system(f"title {NAME}@{ID} {VERSION}")
+            os.system(f"title {NAME}#{ID} {VERSION}")
         except Exception as e:
             print(f"Error updating name: {e}")
     print("")
@@ -294,55 +326,73 @@ def restart_server():
 # send
 def send_message_to_client():
     # send message to client
-    print("\n" + " " * 5 + "Available clients:")
-
+    print("\n" + " " * 5 + "Available clients")
+    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+    
     if not os.path.exists("clients.txt"):
         print(" " * 5 + "No clients found\n")
         return
-
+    
     # Display all clients
     with open("clients.txt", "r") as f:
         for line in f:
             client_info = line.strip()
             if not client_info or "No connected clients" in client_info:
                 continue
-
+            
             is_online = False
             with clients_lock:
-                for addr, name in connected_clients.items():
-                    if f"{addr[0]}:{addr[1]}@{name}" == client_info:
+                for addr, client_data in connected_clients.items():
+                    if isinstance(client_data, dict):
+                        client_name = client_data.get("name", "")
+                        client_id_val = client_data.get("id", "")
+                        online_key = f"{addr[0]}:{addr[1]}@{client_name}#{client_id_val}"
+                    else:
+                        online_key = f"{addr[0]}:{addr[1]}@{client_data}"
+                    
+                    if online_key in client_info:
                         is_online = True
                         break
-
+            
             if is_online:
                 print(" " * 5 + f"{GREEN}{client_info}{RESET}")
             else:
                 print(" " * 5 + f"{GRAY}{client_info}{RESET}")
-
+    
     print()
     print(" " * 5 + "Select client by port (q to quit)")
     selected_port = input("> ").strip().lower()
-
+    
     if selected_port in ["q", ""]:
         return
-
+    
     # Get message
     message = input("> (message) ").strip()
     if not message:
         print("No message sent")
         return
-
+    
     # Send to selected client
     with clients_lock:
-        for addr, name in connected_clients.items():
+        for addr, client_data in connected_clients.items():
             if str(addr[1]) == selected_port:
                 try:
-                    # Note: conn is needed here - requires refactoring to send via socket
-                    print(f"sent {GREEN}{addr[0]}:{addr[1]}@{name}{RESET} {message}")
+                    if isinstance(client_data, dict):
+                        client_socket = client_data.get("socket")
+                        client_name = client_data.get("name", "")
+                        client_id = client_data.get("id", "")
+                        
+                        if client_socket:
+                            client_socket.send(message.encode('utf-8'))
+                            print(f"Sent {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
+                        else:
+                            print("Socket not available")
+                    else:
+                        print("Client data format error")
                 except Exception as e:
                     print(f"Error sending message: {e}")
                 return
-
+    
     print("Client not found or not connected")
 
 # command handler
@@ -362,7 +412,7 @@ def command_handler():
                     else:
                         print("Clear cancelled.")
                 case "exit" | "quit":
-                    print(f"> {RED}{NAME}#{ID}{RESET} is shutting down.")
+                    print(f"> {RED}{NAME}@{ID}{RESET} is shutting down.")
                     exit(0)      
                 case "help" | "commands" | "?":
                     print("\n" + " " * 5 + f"{'Name of Command'.ljust(45)}Description", end="")

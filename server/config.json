@@ -1,8 +1,8 @@
 {
     "ID": "1",
     "NAME": "server",
-    "TYPE": "sys-server",
-    "VERSION": "0.6.1",
+    "TYPE": "server",
+    "VERSION": "0.6.2",
     "HOST": "0.0.0.0",
     "PORT": 5555
 }

@@ -13,7 +13,7 @@ VERSION = config["VERSION"]
 HOST = config["HOST"]
 PORT = config["PORT"]
 
-def handle_name_edit(name):
+def handle_edit_name(name):
     global NAME
     FROM = NAME
     NAME = name
