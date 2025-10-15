@@ -154,6 +154,7 @@ def self():
     try:
         from config import ID, NAME, TYPE, VERSION, HOST, PORT
         name = f"{NAME}@{ID}"
+        print("")
         print(" " * 5 + f"{name.ljust(gap - len(time))}{time}")
         print(" " * 5 + f"{GRAY}{'─' * gap}{RESET} ")
         print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
