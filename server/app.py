@@ -6,7 +6,7 @@ from datetime import datetime
 
 from time import sleep
 from utils import GREEN, RED, GRAY, RESET, is_connected, commands
-from config import ID, NAME, TYPE, VERSION, HOST, PORT, handle_name_edit
+from config import ID, NAME, TYPE, VERSION, HOST, PORT, handle_edit_name
 
 # init
 os.system("color")
@@ -295,7 +295,7 @@ def edit_name():
         print(" " * 5 + f"{prompt.ljust(gap)}")  # zarovnanie promptu do gap
         accept = input(f">").strip().lower()
         if accept == "y":
-            handle_edit_name(new_name)
+            handle_name_edit(new_name)
         else:
             return 
         
@@ -411,6 +411,8 @@ def command_handler():
                         clear_list()
                     else:
                         print("Clear cancelled.")
+                case "edit name":
+                    edit_name()
                 case "exit" | "quit":
                     print(f"> {RED}{NAME}@{ID}{RESET} is shutting down.")
                     exit(0)      
@@ -430,8 +432,6 @@ def command_handler():
                     self()
                 case "show config" | "show conf":
                     show_config()
-                case "name edit":
-                    name_edit()
                 case "restart":
                     restart_server()
                 case "send":
