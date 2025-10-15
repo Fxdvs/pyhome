@@ -83,28 +83,25 @@ def start_server():
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((HOST, PORT))
     server_socket.listen(5)
-    print(f"{NAME}#{ID} is running on {HOST}:{PORT}")
+    print(f"{NAME}@{ID} is running on {HOST}:{PORT}@{NAME}")
 
     return server_socket
 
 # clear list | clear ls
-def clear_list():
+def clear_list():   
     # clear clients list
     if os.path.exists("clients.txt"):
         os.remove("clients.txt")
         print("clients.txt clear successful.")
 
-# config load / conf load
-def config_load():
-    print("Do you want to load the config file? (y/n)")
-    accept = input("> ").strip().lower()
-    if accept == "y":
+# show config | show conf
+def show_config():
         internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
-        gap = 80
+        gap = 70
         try:
             from config import ID, NAME, TYPE, VERSION, HOST, PORT
-            os.system(f"title {NAME}#{ID} {VERSION}")
-            print("\n" + " " * 5 + f"{NAME}") 
+            os.system(f"title {NAME}@{ID} {VERSION}")
+            print("\n" + " " * 5 + f"/config.json") 
             print(" " * 5 + f"{GRAY}{'─' * gap}{RESET} ")
             print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
             print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
@@ -114,10 +111,7 @@ def config_load():
             print(" " * 5 + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
         except Exception as e:
             print(f"Error loading config: {e}")
-        print(" " * 5 + f"{'Connected:'.ljust(gap-len(str(is_connected())))}{internet_status}")
-        print(" " * 5 + f"{'Connected clients:'.ljust(gap-len(str(len(connected_clients))))}{len(connected_clients)}\n")
-    else:
-        pass
+
 # list | l
 def list():
     # display connected clients
@@ -154,13 +148,15 @@ def list():
 def self():
     internet_status = f"{GREEN}True{RESET}" if is_connected() else f"{RED}False{RESET}"
     time = datetime.now().strftime("[%Y:%d:%m:%H:%M:%S]")
-    gap = 50
+    gap = 70
+    
     try:
         from config import ID, NAME, TYPE, VERSION, HOST, PORT
-        print("\n" + " " * 5 + f"{NAME.ljust(gap-len(str(time)))}{time}") 
-        print(" " * 5 + f"{GRAY}{'─' * 50}{RESET} ")
-        print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
+        name = f"{NAME}@{ID}"
+        print(" " * 5 + f"{name.ljust(gap - len(time))}{time}")
+        print(" " * 5 + f"{GRAY}{'─' * gap}{RESET} ")
         print(" " * 5 + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
+        print(" " * 5 + f"{'ID:'.ljust(gap-len(ID))}{ID}")
         print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
         print(" " * 5 + f"{'Version:'.ljust(gap-len(VERSION))}{VERSION}")
         print(" " * 5 + f"{'Host/Adress:'.ljust(gap-len(HOST))}{HOST}")
@@ -173,30 +169,37 @@ def self():
 
 # name edit
 def name_edit():
+    gap = 50
     print("\n" + " " * 5 + "Edit name")
-    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+    print(" " * 5 + f"{GRAY}{'─' * gap}{RESET}")
     try:
         from config import NAME, TYPE
-        print(" " * 5 + f"Type: {TYPE}")
-        print(" " * 5 + f"From: {GRAY}{NAME}{RESET}\n")
+        print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
+        print(" " * 5 + f"{'From:'.ljust(gap-len(NAME))}{GRAY}{NAME}{RESET}\n")
     except Exception as e:
         print(f"Error loading config: {e}")
+    
     new_name = input(">: ").strip().lower()
     if new_name != "":
         print("\n" + " " * 5 + "Edit server name")
-        print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
-        print(" " * 5 + f"Type: {TYPE}")
-        print(" " * 5 + f"From: {GRAY}{NAME}{RESET}")
-        print(" " * 5 + f"To: {GREEN}{new_name}{RESET}\n")
-        print(f"Change from {NAME} to {new_name}? (y/n) ")
+        print(" " * 5 + f"{GRAY}{'─' * gap}{RESET}")
+        print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
+        print(" " * 5 + f"{'From:'.ljust(gap-len(NAME))}{GRAY}{NAME}{RESET}")
+        print(" " * 5 + f"{'To:'.ljust(gap-len(new_name))}{GREEN}{new_name}{RESET}\n")
+        
+        # potvrdenie zmeny
+        prompt = f"Change from {NAME} to {new_name}? (y/n)"
+        print(" " * 5 + f"{prompt.ljust(gap)}")  # zarovnanie promptu do gap
         accept = input(f">").strip().lower()
         if accept == "y":
             handle_name_edit(new_name)
         else:
             return 
+        
+        # aktualizácia názvu v okne
         try:
             from config import NAME, ID, VERSION
-            os.system(f"title {NAME}#{ID} {VERSION}")
+            os.system(f"title {NAME}@{ID} {VERSION}")
         except Exception as e:
             print(f"Error updating name: {e}")
     print("")
@@ -287,8 +290,8 @@ def command_handler():
                         clear_list()
                     else:
                         print("Clear cancelled.")
-                case "config load" | "conf load":
-                    config_load()
+                case "config update" | "conf load": 
+                    config_update()
                 case "exit" | "quit":
                     print(f"> {RED}{NAME}#{ID}{RESET} is shutting down.")
                     exit(0)      
@@ -304,6 +307,8 @@ def command_handler():
                     list()
                 case "self" | "about":
                     self()
+                case "show config" | "show conf":
+                    show_config()
                 case "name edit":
                     name_edit()
                 case "restart":
@@ -314,7 +319,6 @@ def command_handler():
                     continue
                 case _:
                     print("Unknown command. Type 'help | commands | ?' for list of commands.")
-
         except Exception as e:
             print(f"Error in command handler: {e}")
 

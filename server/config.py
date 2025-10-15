@@ -20,11 +20,11 @@ def handle_name_edit(name):
     config["NAME"] = name
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
-    gap = 30
-    print("\n" + " " * 5 + f"{GREEN}{NAME}#{ID}{RESET} had been changed")
-    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
-    print(" " * 5 + f"{'Type:'.ljust(gap)} {TYPE}")
-    print(" " * 5 + f"{'From:'.ljust(gap)} {GRAY}{FROM}{RESET}")
-    print(" " * 5 + f"{'To:'.ljust(gap)} {GREEN}{NAME}{RESET}")
+    gap = 50
+    print("\n" + " " * 5 + f"{GREEN}{NAME}#{ID}{RESET} has been changed.")
+    print(" " * 5 + f"{GRAY}{'─' * gap}{RESET}")
+    print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))} {TYPE}")
+    print(" " * 5 + f"{'From:'.ljust(gap-len(FROM))} {GRAY}{FROM}{RESET}")
+    print(" " * 5 + f"{'To:'.ljust(gap-len(NAME))} {GREEN}{NAME}{RESET}")
     print("\n" +" " * 5 + "To check changes, open config.json")
     FROM = None
