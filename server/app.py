@@ -111,6 +111,7 @@ def show_config():
             print(" " * 5 + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
         except Exception as e:
             print(f"Error loading config: {e}")
+        print()
 
 # list | l
 def list():
@@ -290,8 +291,6 @@ def command_handler():
                         clear_list()
                     else:
                         print("Clear cancelled.")
-                case "config update" | "conf load": 
-                    config_update()
                 case "exit" | "quit":
                     print(f"> {RED}{NAME}#{ID}{RESET} is shutting down.")
                     exit(0)      
