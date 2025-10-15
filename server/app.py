@@ -10,7 +10,7 @@ from config import ID, NAME, VERSION, HOST, PORT, handle_name_edit
 
 # init
 os.system("color")
-os.system(f"title {NAME}#{ID} {VERSION}")
+os.system(f"title {NAME}@{ID} {VERSION}")
 
 # global variables
 connected_clients = {}

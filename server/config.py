@@ -21,7 +21,7 @@ def handle_name_edit(name):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
     gap = 50
-    print("\n" + " " * 5 + f"{GREEN}{NAME}#{ID}{RESET} has been changed.")
+    print("\n" + " " * 5 + f"{GREEN}{NAME}@{ID}{RESET} has been changed.")
     print(" " * 5 + f"{GRAY}{'─' * gap}{RESET}")
     print(" " * 5 + f"{'Type:'.ljust(gap-len(TYPE))} {TYPE}")
     print(" " * 5 + f"{'From:'.ljust(gap-len(FROM))} {GRAY}{FROM}{RESET}")
