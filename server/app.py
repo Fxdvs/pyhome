@@ -18,62 +18,79 @@ clients_lock = threading.Lock()
 
 # client managment
 def handle_client(conn, addr):
-    # handle client connection and communication
+    # Handle individual client connection and communication
     client_name = None
+    client_id = None
     try:
-        # client name from connection
-        client_name = conn.recv(1024).decode("utf-8")
-        if not client_name:
+        # Receive client info (JSON format)
+        client_data = conn.recv(1024).decode('utf-8')
+        if not client_data:
             return
-        # store client in global
+        # Parse JSON
+        try:
+            client_info = json.loads(client_data)
+            client_id = client_info.get("id", "unknown")
+            client_name = client_info.get("name", "unknown")
+        except json.JSONDecodeError:
+            # Fallback: treat as plain string (old format)
+            client_name = client_data
+            client_id = "unknown"
+        
+        # Store client in global dictionary
         with clients_lock:
-            connected_clients[addr] = client_name
-        # save client to storage
-        save_client(addr, client_name)
-        print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET}")
-        # prepare server information
-        server_info = {"name": NAME, "version": VERSION, "host": HOST, "port": PORT}
-        conn.send(json.dumps(server_info).encode("utf-8"))
-        # keep connection and receive messages
+            connected_clients[addr] = {"name": client_name, "id": client_id}
+        
+        # Save client to persistent storage
+        save_client(addr, client_name, client_id)
+        print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}")
+        # Prepare server information
+        server_info = {
+            "id": ID,
+            "name": NAME,
+            "version": VERSION,
+            "host": HOST,
+            "port": PORT
+        }
+        conn.send(json.dumps(server_info).encode('utf-8'))
+        # Keep connection alive and receive messages
         while True:
             try:
                 conn.settimeout(5)
                 data = conn.recv(1024)
                 if not data:
                     break
-
-                message = data.decode("utf-8")
+                
+                message = data.decode('utf-8')
                 print(f"from {GREEN}{addr[0]}:{addr[1]}@{client_name}{RESET} {message}")
+                
             except socket.timeout:
                 continue
             except Exception as e:
                 break
-
     except Exception as e:
         print(f"{RED}Fatal error {addr}: {e}{RESET}")
-
     finally:
-        # remove client from active
+        # Remove client from active connections
         with clients_lock:
             if addr in connected_clients:
-                print(
-                    f"Client disconnected {RED}{addr[0]}:{addr[1]}@{connected_clients[addr]}{RESET}"
-                )
+                client_info = connected_clients[addr]
+                print(f"Client disconnected {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET}")
                 del connected_clients[addr]
         conn.close()
 
-def save_client(addr, client_name):
+# save client
+def save_client(addr, client_name, client_id):
     # Save client info to clients.txt file without duplicates
-    client_key = f"{addr[0]}:{addr[1]}@{client_name}"
-
-    # check client already exists in file
+    client_key = f"{addr[0]}:{addr[1]}@{client_name}#{client_id}"
+    
+    # Check if client already exists in file
     if os.path.exists("clients.txt"):
         with open("clients.txt", "r") as f:
             for line in f:
                 if line.strip() == client_key:
                     return
-
-    # append new client to file
+    
+    # Append new client to file
     with open("clients.txt", "a") as f:
         f.write(f"{client_key}\n")
 # server
@@ -113,7 +130,7 @@ def show_config():
             print(f"Error loading config: {e}")
         print()
 
-# list | l
+# list | ls
 def list():
     # display connected clients
     print("\n" + " " * 5 + "List of connected clients:")
@@ -143,6 +160,58 @@ def list():
             client_id += 1
     if not clients_found:
         print(" " * 5 + "No clients found")
+    print("")
+
+# list -b | ls -b
+def list_b():
+    # display connected clients in columns
+    print("\n" + " " * 5 + "List of connected clients:")
+    print(" " * 5 + f"{GRAY}{'─' * 120}{RESET}")
+
+    if not os.path.exists("clients.txt"):
+        print(" " * 5 + "No clients found")
+        return
+    clients = []
+    with open("clients.txt", "r") as f:
+        for line in f:
+            client_info = line.strip()
+            if not client_info or "No connected clients" in client_info:
+                continue
+            # check if client is online
+            is_online = False
+            with clients_lock:
+                for addr, name in connected_clients.items():
+                    if f"{addr[0]}:{addr[1]}@{name}" == client_info:
+                        is_online = True
+                        break
+            color = GREEN if is_online else GRAY
+            clients.append(f"{color}{client_info}{RESET}")
+    if not clients:
+        print(" " * 5 + "No clients found")
+        return
+    # 5 cols, clients per col 25, 
+    max_per_column = 25
+    num_columns = 5
+    columns = [clients[i:i + max_per_column] for i in range(0, len(clients), max_per_column)]
+
+    # same height for all columns
+    max_height = max(len(col) for col in columns)
+    for col in columns:
+        while len(col) < max_height:
+            col.append("")
+
+    # width of each column
+    col_width = max(len(c.replace(GREEN, "").replace(GRAY, "").replace(RESET, "")) for c in clients) + 10
+
+    # print by rows
+    for row in range(max_height):
+        row_str = " " * 5
+        for col_idx, col in enumerate(columns):
+            if row < len(col):
+                client_id = row + 1 + (col_idx * max_per_column)
+                entry = f"#{client_id:<3} {col[row]:<{col_width}}"
+                row_str += entry
+        print(row_str.rstrip())
     print("")
 
 # self | about
@@ -305,6 +374,8 @@ def command_handler():
                     print()
                 case "list" | "ls":
                     list()
+                case "list -b" | "ls -b":
+                    list_b()
                 case "self" | "about":
                     self()
                 case "show config" | "show conf":

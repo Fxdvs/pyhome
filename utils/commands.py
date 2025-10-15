@@ -7,6 +7,7 @@ commands = [
     {'name': 'self, about', 'description': 'Information about the application', 'type': 'client/server'},
     {'name': 'show config, show conf', 'description': 'Shows formatted config.json', 'type': 'server'},
     {'name': 'list, ls', 'description': 'List all connected clients', 'type': 'server'},
+    {'name': 'list -b, ls -b', 'description': 'List all connected clients for bigger terminal', 'type': 'server'},
     {'name': 'name edit', 'description': 'Changes name of the application.', 'type': 'client/server'},
     {'name': 'reconnect', 'description': 'Reconnect to server.', 'type': 'client'},
     {'name': 'restart', 'description': 'Restarts the application.', 'type': 'client/server'},
