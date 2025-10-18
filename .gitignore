@@ -1,5 +1,1 @@
-/client/__pycache__/
-/client/*/__pycache__/
-/server/__pycache__/
-/server/**/*.txt
-/utils/__pycache__/
+**/__pycache__/
