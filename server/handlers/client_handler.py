@@ -4,6 +4,7 @@ import threading
 import socket
 from utils.colors import GREEN, RED, RESET
 from utils.config import get_config
+from utils.console import print_message
 
 CLIENTS_FILE = "data/clients.json"
 
@@ -15,7 +16,6 @@ server_info = {
     "host": get_config("HOST"),
     "port": get_config("PORT"),
 }
-
 
 # global vars
 connected_clients = {}
@@ -42,7 +42,7 @@ def handle_client(conn, addr):
             connected_clients[addr] = {"name": client_name, "id": client_id, "socket": conn}
 
         save_client(addr, client_name, client_id)
-        print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}")
+        print_message(f"Client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET} has connected")
 
         # send server info
         conn.send(json.dumps(server_info).encode("utf-8"))
@@ -55,20 +55,23 @@ def handle_client(conn, addr):
                 if not data:
                     continue #  client doesnt disconnect
                 message = data.decode("utf-8")
-                print(f"From {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
+                print_message(f"From client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
             except socket.timeout:
                 continue  # ignore timeout
-            except Exception as e:
-                print(f"{RED}Client {addr} error: {e}{RESET}")
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} has disconnected unexpectedly")
                 break
-
+            except Exception as e:
+                print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} had an unexpected error: {e}")
+                break
     except Exception as e:
-        print(f"{RED}Fatal error {addr}: {e}{RESET}")
+        print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} had a fatal error: {e}")
+
     finally:
         with clients_lock:
             if addr in connected_clients:
                 client_info = connected_clients[addr]
-                print(f"Client disconnected {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET}")
+                print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} has disconnected")
                 del connected_clients[addr]
         conn.close()
 
