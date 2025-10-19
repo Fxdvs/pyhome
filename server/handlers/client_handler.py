@@ -5,6 +5,8 @@ import socket
 from utils.colors import GREEN, RED, RESET
 from utils.config import get_config
 
+CLIENTS_FILE = "data/clients.json"
+
 server_info = {
     "id": get_config("ID"),
     "name": get_config("NAME"),
@@ -14,15 +16,13 @@ server_info = {
     "port": get_config("PORT"),
 }
 
-# Globálna zdieľaná pre server
+
+# global vars
 connected_clients = {}
 clients_lock = threading.Lock()
 
-# =========================
-# Funkcie na správu klientov
-# =========================
+# handle client
 def handle_client(conn, addr):
-    """Správa jednotlivého klienta"""
     client_name = None
     client_id = None
     try:
@@ -44,20 +44,20 @@ def handle_client(conn, addr):
         save_client(addr, client_name, client_id)
         print(f"\nClient connected {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}")
 
-        # Poslanie info klientovi
+        # send server info
         conn.send(json.dumps(server_info).encode("utf-8"))
 
-        # Udržiavanie spojenia
+        # receive messages
         while True:
             try:
-                conn.settimeout(1)  # kratší timeout na recv
+                conn.settimeout(1)  
                 data = conn.recv(1024)
                 if not data:
-                    continue  # nech klient ostane pripojený
+                    continue #  client doesnt disconnect
                 message = data.decode("utf-8")
                 print(f"From {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
             except socket.timeout:
-                continue  # timeout ignorujeme, cyklus beží ďalej
+                continue  # ignore timeout
             except Exception as e:
                 print(f"{RED}Client {addr} error: {e}{RESET}")
                 break
@@ -72,17 +72,14 @@ def handle_client(conn, addr):
                 del connected_clients[addr]
         conn.close()
 
-# =========================
-# Ukladanie klientov
-# =========================
-CLIENTS_FILE = "data/clients.json"
+# save client
 def save_client(addr, client_name, client_id):
     client_data = {
         "ID": client_id,
         "NAME": client_name
     }
 
-    # načítanie existujúcich klientov
+    # load existing clients
     clients = []
     if os.path.exists(CLIENTS_FILE):
         with open(CLIENTS_FILE, "r") as f:
@@ -91,7 +88,7 @@ def save_client(addr, client_name, client_id):
             except json.JSONDecodeError:
                 clients = []
 
-    # aktualizovanie existujúceho klienta podľa ID
+    # update or add client
     updated = False
     for i, c in enumerate(clients):
         if c.get("ID") == client_id:
@@ -102,6 +99,6 @@ def save_client(addr, client_name, client_id):
     if not updated:
         clients.append(client_data)
 
-    # uloženie do JSON súboru
+    # save to .json
     with open(CLIENTS_FILE, "w") as f:
         json.dump(clients, f, indent=4)

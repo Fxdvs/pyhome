@@ -10,7 +10,7 @@ NAME = get_config("NAME")
 ID = get_config("ID")
 VERSION = get_config("VERSION")
 
-# init
+# init app
 os.system("color")
 os.system(f"title {NAME}#{ID} {VERSION}")
 
