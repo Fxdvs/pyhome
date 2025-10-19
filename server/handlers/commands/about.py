@@ -2,7 +2,7 @@ import re
 
 from utils.colors import GREEN, RED, GRAY, RESET
 from utils.config import get_config
-from utils.network import connection_status
+from utils.network import get_connection
 from handlers.commands.list import list_clients
 
 command = ["about","self"]
@@ -18,7 +18,7 @@ PORT = get_config("PORT")
 gap = 50
 margin = " " * 5
 name = f"{NAME}#{ID}"
-status = f"{GREEN}Online{RESET}" if connection_status() else f"{RED}Offline{RESET}"
+status = f"{GREEN}Online{RESET}" if get_connection() else f"{RED}Offline{RESET}"
 
 def about():
     print("\n" + margin + f"{name}")
@@ -30,5 +30,5 @@ def about():
     print(margin + f"{'Host/Adress:'.ljust(gap-len(HOST))}{HOST}")
     print(margin + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
     print(margin + f"{'Status:'.ljust(gap-len(re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]').sub('', status)))}{status}\n")
-    if connection_status() == True:
+    if get_connection() == True:
         list_clients()
