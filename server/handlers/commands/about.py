@@ -3,6 +3,7 @@ import re
 from utils.colors import GREEN, RED, GRAY, RESET
 from utils.config import get_config
 from utils.network import connection_status
+from handlers.commands.list import list_clients
 
 command = ["about","self"]
 description = "Information about the application"
@@ -30,6 +31,4 @@ def about():
     print(margin + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
     print(margin + f"{'Status:'.ljust(gap-len(re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]').sub('', status)))}{status}\n")
     if connection_status() == True:
-        print(margin + "Connected Clients")
-        print(margin + f"{GRAY}{'─' * gap}{RESET}")
-        print()
+        list_clients()
