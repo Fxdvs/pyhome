@@ -5,7 +5,7 @@ from utils.symbols import SUCCESS, ERROR, QUESTION
 command = ["data clients clear","data clients cls"]
 description = "Clears the client list"
 
-def data_clients_clear():   
+async def data_clients_clear():   
     print(f"{QUESTION} Are you sure you want to clear the client list? (y/n)")
     accept = input(">").strip().lower()
     if accept == "y":

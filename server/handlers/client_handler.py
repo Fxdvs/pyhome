@@ -1,7 +1,6 @@
 import json
 import os
-import threading
-import socket
+import asyncio
 from utils.colors import GREEN, RED, RESET
 from utils.config import get_config
 from utils.console import print_message
@@ -19,17 +18,25 @@ server_info = {
 
 # global vars
 connected_clients = {}
-clients_lock = threading.Lock()
+clients_lock = asyncio.Lock()
 
-# handle client
-def handle_client(conn, addr):
+async def handle_client_async(reader, writer):
+    """Handle client connection (async)"""
+    addr = writer.get_extra_info('peername')
     client_name = None
     client_id = None
+    
     try:
-        client_data = conn.recv(1024).decode("utf-8")
+        # get client data
+        data = await reader.read(1024)
+        client_data = data.decode("utf-8")
+        
         if not client_data:
+            writer.close()
+            await writer.wait_closed()
             return
-
+        
+        # parse json
         try:
             client_info = json.loads(client_data)
             client_id = client_info.get("id", "unknown")
@@ -37,52 +44,55 @@ def handle_client(conn, addr):
         except json.JSONDecodeError:
             client_name = client_data
             client_id = "unknown"
-
-        with clients_lock:
-            connected_clients[addr] = {"name": client_name, "id": client_id, "socket": conn}
-
+        
+        # store client
+        async with clients_lock:
+            connected_clients[addr] = {
+                "name": client_name,
+                "id": client_id,
+                "writer": writer
+            }
+        
         save_client(addr, client_name, client_id)
         print_message(f"Client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET} has connected")
-
-        # send server info
-        conn.send(json.dumps(server_info).encode("utf-8"))
-
+        
+        # send information about server
+        writer.write(json.dumps(server_info).encode("utf-8"))
+        await writer.drain()
+        
         # receive messages
         while True:
             try:
-                conn.settimeout(1)  
-                data = conn.recv(1024)
+                data = await asyncio.wait_for(reader.read(1024), timeout=5.0)
+                
                 if not data:
-                    continue #  client doesnt disconnect
+                    break
+                
                 message = data.decode("utf-8")
                 print_message(f"From client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
-            except socket.timeout:
-                continue  # ignore timeout
-            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
-                print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} has disconnected unexpectedly")
+                
+            except asyncio.TimeoutError:
+                continue
+            except Exception:
                 break
-            except Exception as e:
-                print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} had an unexpected error: {e}")
-                break
+    
     except Exception as e:
-        print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} had a fatal error: {e}")
-
+        print_message(f"Client {RED}{addr}@{client_name}#{client_id}{RESET} had a fatal error: {e}")
+    
     finally:
-        with clients_lock:
+        # remove client
+        async with clients_lock:
             if addr in connected_clients:
                 client_info = connected_clients[addr]
                 print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} has disconnected")
                 del connected_clients[addr]
-        conn.close()
+        
+        writer.close()
+        await writer.wait_closed()
 
-# save client
+
 def save_client(addr, client_name, client_id):
-    client_data = {
-        "ID": client_id,
-        "NAME": client_name
-    }
-
-    # load existing clients
+    client_data = {"ID": client_id, "NAME": client_name}
     clients = []
     if os.path.exists(CLIENTS_FILE):
         with open(CLIENTS_FILE, "r") as f:
@@ -90,18 +100,26 @@ def save_client(addr, client_name, client_id):
                 clients = json.load(f)
             except json.JSONDecodeError:
                 clients = []
-
-    # update or add client
+    
+    # update or add
     updated = False
     for i, c in enumerate(clients):
         if c.get("ID") == client_id:
             clients[i] = client_data
             updated = True
             break
-
+    
     if not updated:
         clients.append(client_data)
-
-    # save to .json
+    
     with open(CLIENTS_FILE, "w") as f:
         json.dump(clients, f, indent=4)
+
+
+# number of connected clients
+def get_connected_clients():
+    return connected_clients
+
+# lock
+def get_clients_lock():
+    return clients_lock

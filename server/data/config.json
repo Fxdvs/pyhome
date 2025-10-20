@@ -2,7 +2,7 @@
     "ID": "1",
     "NAME": "server",
     "TYPE": "server",
-    "VERSION": "0.7",
+    "VERSION": "0.8",
     "HOST": "0.0.0.0",
     "PORT": 50000
 }

@@ -1,47 +1,106 @@
-import os
 import json
+import os
 from utils.colors import GREEN, GRAY, RESET
-from handlers.client_handler import connected_clients, clients_lock
+from handlers.client_handler import get_connected_clients, get_clients_lock
 
 command = ["list", "ls"]
-description = "Lists all clients"
+description = "List all clients (use -b for grid view)"
 
 CLIENTS_FILE = "data/clients.json"
 
-margin = " " * 5
 
-def list_clients():
-    print("\n" + margin + "List of connected clients")
-    print(margin + f"{GRAY}{'─' * 50}{RESET}")
+def list_clients(*params):
+    """List clients - supports -b parameter for grid view"""
+    
+    # Check for -b parameter
+    if "-b" in params or "--big" in params:
+        list_big()
+    else:
+        list_normal()
 
+
+def list_normal():
+    """Normal list view"""
+    print("\n" + " " * 5 + "List of clients:")
+    print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
+    
     if not os.path.exists(CLIENTS_FILE):
-        print(margin + "No clients found\n")
+        print(" " * 5 + "No clients found\n")
         return
     
-    try:
-        with open(CLIENTS_FILE, "r") as f:
-            clients_data = json.load(f)
-    except Exception:
-        print(margin + "Failed to read clients file\n")
+    with open(CLIENTS_FILE, "r") as f:
+        try:
+            clients = json.load(f)
+        except json.JSONDecodeError:
+            print(" " * 5 + "Error loading clients\n")
+            return
+    
+    if not clients:
+        print(" " * 5 + "No clients found\n")
         return
     
-    if not clients_data:
-        print(margin + "No clients found\n")
-        return
+    # Get online clients
+    connected_clients = get_connected_clients()
     
-    for idx, client in enumerate(clients_data, 1):
+    online_ids = set()
+    for addr, client_data in connected_clients.items():
+        online_ids.add(client_data.get("id"))
+    
+    # Display clients
+    for i, client in enumerate(clients, 1):
+        client_id = client.get("ID", "?")
         client_name = client.get("NAME", "Unknown")
-        client_id_val = client.get("ID", "Unknown")
-        client_key = f"{client_name}#{client_id_val}"
-
-        is_online = False
-        with clients_lock:
-            for addr, client_data in connected_clients.items():
-                if isinstance(client_data, dict):
-                    online_key = f"{client_data.get('name', '')}#{client_data.get('id', '')}"
-                    if online_key == client_key:
-                        is_online = True
-                        break
+        
+        is_online = client_id in online_ids
         color = GREEN if is_online else GRAY
-        print(f"{margin}#{idx} {color}{client_key}{RESET}")
+        
+        print(" " * 5 + f"#{i} {color}{client_name}#{client_id}{RESET}")
+    
+    print()
+
+
+def list_big():
+    """Grid view (5 columns)"""
+    print("\n" + " " * 5 + "List of clients (grid view):")
+    print(" " * 5 + f"{GRAY}{'─' * 120}{RESET}")
+    
+    if not os.path.exists(CLIENTS_FILE):
+        print(" " * 5 + "No clients found\n")
+        return
+    
+    with open(CLIENTS_FILE, "r") as f:
+        try:
+            clients = json.load(f)
+        except json.JSONDecodeError:
+            print(" " * 5 + "Error loading clients\n")
+            return
+    
+    if not clients:
+        print(" " * 5 + "No clients found\n")
+        return
+    
+    # Get online clients
+    connected_clients = get_connected_clients()
+    
+    online_ids = set()
+    for addr, client_data in connected_clients.items():
+        online_ids.add(client_data.get("id"))
+    
+    # Format clients
+    formatted_clients = []
+    for i, client in enumerate(clients, 1):
+        client_id = client.get("ID", "?")
+        client_name = client.get("NAME", "Unknown")
+        
+        is_online = client_id in online_ids
+        color = GREEN if is_online else GRAY
+        
+        formatted_clients.append(f"#{i} {color}{client_name}#{client_id}{RESET}")
+    
+    # Display in 5 columns
+    num_cols = 5
+    for i in range(0, len(formatted_clients), num_cols):
+        row = formatted_clients[i:i + num_cols]
+        print(" " * 5 + "   ".join(row))
+    
     print()

@@ -1,16 +1,22 @@
-import socket
+import asyncio
 
-from utils.symbols import SUCCESS
+from utils.colors import GREEN, RESET
 from utils.config import get_config
+from handlers.client_handler import handle_client_async
 
 NAME = get_config("NAME")
 ID = get_config("ID")
 HOST = get_config("HOST")
 PORT = get_config("PORT")
 
-def start_server():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(5)
-    print(f"{SUCCESS} {NAME}#{ID} running on {HOST}:{PORT}")
-    return server_socket
+async def start_server_async():
+    server = await asyncio.start_server(
+        handle_client_async,
+        HOST,
+        PORT
+    )
+
+    addr = server.sockets[0].getsockname()
+    print(f"{GREEN}{NAME}#{ID}{RESET} running on {addr[0]}:{addr[1]}")
+    
+    return server

@@ -13,7 +13,7 @@ TYPE = get_config("TYPE")
 gap = 50
 margin = " " * 5
 
-def data_config_edit_name():
+async def data_config_edit_name():
     print(f"{QUESTION} Are you sure you want to edit the server name? (y/n)")
     accept = input(">").strip().lower()
     if accept != "y":

@@ -14,7 +14,7 @@ PORT = get_config("PORT")
 gap = 50
 margin = " " * 5
 
-def data_config_show():
+async def data_config_show():
     print("\n" + margin + "/data/config.json")
     print(margin + f"{GRAY}{'─' * gap}{RESET} ")
     print(margin + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
