@@ -1,4 +1,4 @@
-import json
+import json 
 import os
 import socket
 import time
@@ -15,7 +15,7 @@ os.system(f"title {NAME} {VERSION}")
 # global variables
 CONNECTED = False
 s = None
-server_info = {}
+server_info = {} 
 connection_lock = threading.Lock()
 auto_reconnect = False
 
@@ -46,7 +46,7 @@ def connect_to_server():
                     server_data = s.recv(1024).decode('utf-8')
                     server_info = json.loads(server_data)
                     
-                    CONNECTED = True
+                    CONNECTED = True 
                     auto_reconnect = False
                     print(f"\nConnected to {GREEN}{server_info['host']}:{server_info['port']}@{server_info['name']}#{server_info['id']}{RESET}")
 
@@ -104,7 +104,6 @@ def receive_messages():
                 CONNECTED = False
             print(f"\n{RED}Error receiving: {e}{RESET}")
             time.sleep(1)
-
 
 # edit name
 def edit_name():
@@ -259,7 +258,6 @@ def command_handler():
             print(f"Error in command handler: {e}")
             with connection_lock:
                 CONNECTED = False
-
 
 # main
 if __name__ == "__main__":

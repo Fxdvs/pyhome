@@ -4,5 +4,5 @@
     "TYPE": "client",
     "VERSION": "0.5",
     "HOST": "127.0.0.1",
-    "PORT": 5555
+    "PORT": 50000
 }
