@@ -24,7 +24,7 @@ def load_commands():
             # Find run function
             run_func = None
             for attr_name in dir(command):
-                attr = getattr(command, attr_name)
+                attr = getattr(command, "function", None)
                 if callable(attr) and not attr_name.startswith("_"):
                     run_func = attr
                     break
