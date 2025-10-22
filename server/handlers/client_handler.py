@@ -21,7 +21,6 @@ connected_clients = {}
 clients_lock = asyncio.Lock()
 
 async def handle_client_async(reader, writer):
-    """Handle client connection (async)"""
     addr = writer.get_extra_info('peername')
     client_name = None
     client_id = None
