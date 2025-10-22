@@ -1,4 +1,5 @@
 import re
+
 from utils.colors import GREEN, RED, GRAY, RESET
 from utils.config import get_config
 from utils.network import get_connection
@@ -17,7 +18,7 @@ gap = 50
 margin = " " * 5
 name = f"{NAME}#{ID}"
 
-async def about():
+async def function():
     status = f"{GREEN}True{RESET}" if get_connection() else f"{RED}False{RESET}"
     
     print("\n" + margin + f"{name}")

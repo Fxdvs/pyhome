@@ -8,7 +8,7 @@ description = "Shuts down the server"
 NAME = get_config("NAME")
 ID = get_config("ID")
 
-def close():
+def function():
     print(f"{QUESTION} Are you sure you want to shut down the server? (y/n)")
     accept = input(">").strip().lower()
     if accept == "y":

@@ -12,7 +12,7 @@ COMMANDS_PATH = os.path.join(os.path.dirname(__file__), "..", "commands")
 gap = 35
 margin = " " * 5
 
-def help():
+def function():
     commands = []
     for file in os.listdir(COMMANDS_PATH):
         if not file.endswith(".py") or file == "__init__.py":
