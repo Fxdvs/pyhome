@@ -50,6 +50,9 @@ async def command_handler_async():
             # input without blocking
             cmd = await loop.run_in_executor(None, input, "> ")
             
+            if cmd.strip() == "":
+                continue
+
             if cmd.strip() in commands:
                 try:
                     # check if command is async
