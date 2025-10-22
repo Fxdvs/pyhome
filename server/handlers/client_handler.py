@@ -89,7 +89,6 @@ async def handle_client_async(reader, writer):
         writer.close()
         await writer.wait_closed()
 
-
 def save_client(addr, client_name, client_id):
     client_data = {"ID": client_id, "NAME": client_name}
     clients = []
@@ -113,7 +112,6 @@ def save_client(addr, client_name, client_id):
     
     with open(CLIENTS_FILE, "w") as f:
         json.dump(clients, f, indent=4)
-
 
 # number of connected clients
 def get_connected_clients():

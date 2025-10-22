@@ -1,10 +1,12 @@
 import os
 import asyncio
+import uvicorn
 
 from utils.config import get_config
 from handlers.server_handler import start_server_async
 from handlers.command_handler import command_handler_async
 from handlers.client_handler import handle_client_async
+from handlers.web_handler import app
 
 NAME = get_config("NAME")
 ID = get_config("ID")
@@ -18,6 +20,11 @@ os.system(f"title {NAME}#{ID} {VERSION}")
 async def accept_clients(server):
     async with server:
         await server.serve_forever()
+        
+async def start_web():
+    config = uvicorn.Config(app, host="0.0.0.0", port=50001, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 # run handlers in parallel
 async def main():
@@ -26,6 +33,7 @@ async def main():
     # handlers
     await asyncio.gather(
         accept_clients(server),
+        start_web(),
         command_handler_async()
     )
 
