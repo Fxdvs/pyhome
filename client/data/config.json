@@ -1,8 +1,8 @@
 {
     "ID": "1",
-    "NAME": "client",
+    "NAME": "Client",
     "TYPE": "client",
-    "VERSION": "0.5",
+    "VERSION": "0.7",
     "HOST": "127.0.0.1",
     "PORT": 50000
 }
