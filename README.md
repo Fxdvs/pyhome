@@ -12,10 +12,11 @@ Both sides run as a console application with their own command prompt.
 ## Requirements
 
 - Python 3.9 or newer
-- `fastapi` and `uvicorn` (server only)
+- `fastapi` and `uvicorn`, for the server. The client needs nothing beyond the
+  standard library.
 
 ```
-py -m pip install fastapi uvicorn
+py -m pip install -r requirements.txt
 ```
 
 ## Running
@@ -59,7 +60,7 @@ pyhome/
 │   ├── app.py                    entry point, runs all handlers with asyncio.gather
 │   ├── data/
 │   │   ├── config.json           server identity and network settings
-│   │   └── clients.json          every client that has ever connected
+│   │   └── clients.json          every client seen so far, created at runtime
 │   └── handlers/
 │       ├── server_handler.py     opens the TCP listener
 │       ├── client_handler.py     one coroutine per connected client

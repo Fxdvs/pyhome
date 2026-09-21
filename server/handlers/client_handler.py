@@ -133,10 +133,6 @@ def save_client(addr, client_name, client_id):
 def get_connected_clients():
     return connected_clients
 
-# lock
-def get_clients_lock():
-    return clients_lock
-
 
 async def send_to_clients(target, text):
     """Send a message to one client id, or to every client when target is 'all'.
