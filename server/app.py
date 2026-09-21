@@ -8,9 +8,10 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(APP_DIR)
 sys.path.insert(0, ROOT_DIR)
 
-# config has to know which data folder is ours before anything reads it
+# config has to know which file is ours before anything reads it,
+# --config picks another one so several instances can run from one folder
 from shared import config  # noqa: E402
-config.init(APP_DIR)
+config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
 from shared.colors import GREEN, RESET  # noqa: E402
 from shared.config import get_config  # noqa: E402
@@ -89,3 +90,9 @@ if __name__ == "__main__":
         print(f"\n{NAME} is turned off.")
     except Exception as e:
         print(f"Fatal error: {e}")
+        # the launcher starts us without a batch file ending in pause,
+        # so without this the window closes before the error can be read
+        try:
+            input("Press Enter to close.")
+        except (EOFError, KeyboardInterrupt):
+            pass
