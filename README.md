@@ -43,7 +43,9 @@ py app.py --config data/kitchen.json
 
 A new config file only needs `NAME` plus the network settings. If `ID` is
 missing or empty, the first run generates one (8 hex characters) and writes it
-back into the file.
+back into the file. When making a new config by copying an existing one,
+delete its `ID` line (or leave it empty) so the first run gives it a fresh
+one; the launcher refuses configs that share an ID.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:

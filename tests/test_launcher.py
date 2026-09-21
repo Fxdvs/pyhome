@@ -28,7 +28,7 @@ def write(path, text):
 
 def test_lists_client_configs(tmp):
     write(os.path.join(tmp, "b.json"), json.dumps({"NAME": "Plain"}))
-    write(os.path.join(tmp, "a.json"), json.dumps({"NAME": "Kitchen", "DEVICE": "light"}))
+    write(os.path.join(tmp, "a.json"), json.dumps({"NAME": "Kitchen", "DEVICE": "light", "ID": "a1"}))
     write(os.path.join(tmp, "c.json"), "{not json")
     write(os.path.join(tmp, "notes.txt"), "ignored")
 
@@ -36,10 +36,32 @@ def test_lists_client_configs(tmp):
 
     assert [e["file"] for e in entries] == ["a.json", "b.json", "c.json"], entries
     a, b, c = entries
-    assert a == {"file": "a.json", "path": os.path.join(tmp, "a.json"),
+    assert a == {"file": "a.json", "path": os.path.join(tmp, "a.json"), "id": "a1",
                  "name": "Kitchen", "device": "light", "error": None}, a
-    assert b["name"] == "Plain" and b["device"] is None and b["error"] is None, b
-    assert c["error"] == "invalid JSON" and c["name"] is None, c
+    assert b["name"] == "Plain" and b["device"] is None and b["error"] is None and b["id"] is None, b
+    assert c["error"] == "invalid JSON" and c["name"] is None and c["id"] is None, c
+
+
+def test_duplicate_ids_are_flagged(tmp):
+    write(os.path.join(tmp, "a.json"), json.dumps({"NAME": "A", "ID": "1"}))
+    write(os.path.join(tmp, "b.json"), json.dumps({"NAME": "B", "ID": "1"}))
+    write(os.path.join(tmp, "c.json"), json.dumps({"NAME": "C", "ID": "2"}))
+
+    entries = launcher.list_client_configs(tmp)
+
+    a, b, c = entries
+    assert a["error"] == "duplicate ID 1", a
+    assert b["error"] == "duplicate ID 1", b
+    assert c["error"] is None, c
+
+
+def test_missing_or_empty_ids_are_not_duplicates(tmp):
+    write(os.path.join(tmp, "a.json"), json.dumps({"NAME": "A"}))
+    write(os.path.join(tmp, "b.json"), json.dumps({"NAME": "B", "ID": ""}))
+
+    entries = launcher.list_client_configs(tmp)
+
+    assert entries[0]["error"] is None and entries[1]["error"] is None, entries
 
 
 def test_empty_device_counts_as_none(tmp):

@@ -23,6 +23,12 @@ NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 # how often the status column is refreshed, in milliseconds
 POLL_MS = 1000
 
+# Popen returns as soon as the server process exists, well before it has
+# imported fastapi/uvicorn and started listening. A client started right away
+# would fail its first connection attempt and then sit out its own retry
+# delay, so give the server a head start before starting any client.
+SERVER_HEAD_START_MS = 2000
+
 COLOR_RUNNING = "#2e7d32"
 COLOR_STOPPED = "#757575"
 COLOR_EXITED = "#c62828"
@@ -41,7 +47,12 @@ def python_executable(executable=sys.executable):
 
 
 def list_client_configs(data_dir):
-    """One entry per *.json in data_dir, sorted by file name."""
+    """One entry per *.json in data_dir, sorted by file name.
+
+    Two configs sharing a non-empty id would collapse into one row wherever
+    the id is the key (the dashboard, clients.json, `send <id>`), so both are
+    flagged with an error instead of silently letting that happen.
+    """
     if not os.path.isdir(data_dir):
         return []
 
@@ -51,21 +62,36 @@ def list_client_configs(data_dir):
             continue
 
         path = os.path.join(data_dir, file)
-        entry = {"file": file, "path": path, "name": None, "device": None, "error": None}
+        entry = {"file": file, "path": path, "name": None, "device": None, "id": None, "error": None}
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             entry["name"] = data.get("NAME")
             entry["device"] = data.get("DEVICE") or None
+            entry["id"] = data.get("ID") or None
         except (OSError, ValueError, AttributeError):
             # AttributeError: valid JSON that is not an object has no .get
             entry["error"] = "invalid JSON"
         entries.append(entry)
+
+    seen = {}
+    for entry in entries:
+        if entry["id"]:
+            seen[entry["id"]] = seen.get(entry["id"], 0) + 1
+    for entry in entries:
+        if entry["id"] and seen[entry["id"]] > 1:
+            entry["error"] = f"duplicate ID {entry['id']}"
+
     return entries
 
 
 def build_command(config_path):
     return [python_executable(), "app.py", "--config", config_path]
+
+
+def head_start_ms(server_started):
+    """0, unless server_started, then SERVER_HEAD_START_MS."""
+    return SERVER_HEAD_START_MS if server_started else 0
 
 
 class App:
@@ -184,14 +210,32 @@ class LauncherWindow:
         self.rows.append((app, var, status))
 
     def run(self):
-        # rows hold the server first, so the clients find it on their first try
-        for app, var, _ in self.rows:
-            if not var.get():
-                continue
-            try:
-                app.start()
-            except OSError as e:
-                messagebox.showerror("Smart home launcher", f"Could not start {app.label}:\n{e}")
+        # rows hold the server first (see refresh), so this is always its row
+        server_app, server_var, _ = self.rows[0]
+        client_rows = self.rows[1:]
+
+        server_started = server_var.get() and self.start_app(server_app)
+
+        delay = head_start_ms(server_started)
+        if delay:
+            self.root.after(delay, lambda: self.start_rows(client_rows))
+        else:
+            self.start_rows(client_rows)
+
+        self.update_status()
+
+    def start_app(self, app):
+        """Starts app, reporting a failure to start instead of raising."""
+        try:
+            return app.start()
+        except OSError as e:
+            messagebox.showerror("Smart home launcher", f"Could not start {app.label}:\n{e}")
+            return False
+
+    def start_rows(self, rows):
+        for app, var, _ in rows:
+            if var.get():
+                self.start_app(app)
         self.update_status()
 
     def stop(self, app):
