@@ -21,11 +21,11 @@ py -m pip install -r requirements.txt
 
 ## Running
 
-On Windows, start both at once:
-
-```
-start_all.bat
-```
+On Windows, double click `launcher.pyw`. It lists the server and every client
+config in `client/data/`. Tick what you want and press **Run**. Every app opens
+in its own console, the launcher shows which are running and stops them one by
+one or all at once. Stopping ends the process, the server sees that as an
+ordinary dropped connection.
 
 Or start them separately, each in its own console:
 
@@ -33,6 +33,17 @@ Or start them separately, each in its own console:
 cd server && start.bat
 cd client && start.bat
 ```
+
+A client can use another config file, which is how one checkout runs several
+clients:
+
+```
+py app.py --config data/kitchen.json
+```
+
+A new config file only needs `NAME` plus the network settings. If `ID` is
+missing or empty, the first run generates one (8 hex characters) and writes it
+back into the file.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:
@@ -73,7 +84,8 @@ pyhome/
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
 │       └── commands/             client only commands
-└── start_all.bat
+├── tests/                        plain scripts, run all with py tests/run_all.py
+└── launcher.pyw                  GUI that starts and stops the server and clients
 ```
 
 Server and client keep only what is genuinely their own. Everything that was the
@@ -81,11 +93,11 @@ same on both sides lives in `shared/`.
 
 ## Configuration
 
-Both sides read `data/config.json`:
+Both sides read `data/config.json`, or the file given with `--config`:
 
 | Key | Description |
 | --- | --- |
-| `ID` | identifier, sent during the handshake |
+| `ID` | identifier, sent during the handshake, generated on first run when empty |
 | `NAME` | display name |
 | `TYPE` | `server` or `client` |
 | `VERSION` | version string, shown in the window title |
@@ -183,10 +195,16 @@ of device travels as `device_type`.
 
 The server stores every client it has seen in `data/clients.json`.
 
+## Tests
+
+Plain scripts with asserts, no framework needed:
+
+```
+py tests/run_all.py
+```
+
 ## Known limitations
 
-- **One identity per checkout.** `ID` is fixed in `data/config.json`, so running
-  several clients means several copies of the folder.
 - **No authentication.** The TCP listener and the dashboard both bind to
   `0.0.0.0` and accept anyone who can reach them.
 - **Clients are not addressable by name.** `send` takes an id or `all`.
