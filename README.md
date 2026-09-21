@@ -198,3 +198,6 @@ The server stores every client it has seen in `data/clients.json`.
 3. Per instance configuration so one checkout can run several clients
 4. Device modules, so a client can declare what it is and what it can do
 5. Authentication during the handshake
+
+Items 3 to 5 are v1.0 and are specified in
+[docs/v1.0-spec.md](docs/v1.0-spec.md).
