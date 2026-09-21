@@ -136,3 +136,29 @@ def get_connected_clients():
 # lock
 def get_clients_lock():
     return clients_lock
+
+
+async def send_to_clients(target, text):
+    """Send a message to one client id, or to every client when target is 'all'.
+
+    Returns (delivered, failed) as lists of "name#id" labels.
+    """
+    async with clients_lock:
+        # copy the matches out, so the lock is not held while writing
+        recipients = [
+            (addr, info) for addr, info in connected_clients.items()
+            if target == "all" or info["id"] == target
+        ]
+
+    delivered = []
+    failed = []
+
+    for addr, info in recipients:
+        label = f"{info['name']}#{info['id']}"
+        try:
+            await send_message(info["writer"], MESSAGE, text=text)
+            delivered.append(label)
+        except Exception as e:
+            failed.append(f"{label} ({e})")
+
+    return delivered, failed
