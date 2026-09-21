@@ -13,6 +13,8 @@ from shared import config  # noqa: E402
 config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
 from shared.config import get_config  # noqa: E402
+from shared.colors import GREEN, RESET  # noqa: E402
+from handlers.device_handler import get_capabilities, load_device  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
 from handlers.connection_handler import connect_to_server_async  # noqa: E402
@@ -28,6 +30,9 @@ COMMAND_SOURCES = [
     (os.path.join(APP_DIR, "handlers", "commands"), "handlers.commands"),
 ]
 
+# DEVICE names a folder in here
+DEVICES_DIR = os.path.join(APP_DIR, "devices")
+
 # init app, both commands only exist on windows
 if os.name == "nt":
     os.system("color")
@@ -35,6 +40,10 @@ if os.name == "nt":
 
 # run handlers in parallel
 async def main():
+    # a missing device raises here and ends up in "Fatal error", on purpose
+    if load_device(DEVICES_DIR, "devices", get_config("DEVICE")) is not None:
+        print(f"Device {GREEN}{get_config('DEVICE')}{RESET}: {', '.join(get_capabilities())}")
+
     # handlers
     await asyncio.gather(
         connect_to_server_async(),

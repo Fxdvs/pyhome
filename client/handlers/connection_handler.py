@@ -3,7 +3,8 @@ import asyncio
 from shared.colors import GREEN, RED, RESET
 from shared.config import get_config
 from shared.console import print_message
-from shared.protocol import HELLO, WELCOME, ProtocolError, read_message, send_message
+from shared.protocol import HELLO, STATE, WELCOME, ProtocolError, read_message, send_message
+from handlers.device_handler import GET_STATE, get_capabilities, get_device, run_action
 
 RETRY_SECONDS = 15
 HANDSHAKE_TIMEOUT = 10
@@ -91,6 +92,8 @@ async def handshake():
         name=get_config("NAME"),
         # the config's TYPE, client or server, "type" itself is the envelope field
         role=get_config("TYPE"),
+        device=get_config("DEVICE") or None,
+        capabilities=get_capabilities(),
         version=get_config("VERSION"),
     )
 
@@ -103,3 +106,20 @@ async def handshake():
 
     connection.attach(reader, writer, welcome)
     print_message(f"Connected to {GREEN}{connection.label}{RESET}")
+
+    # the server keeps the last known state, give it one to start from
+    if get_device() is not None:
+        await send_message(writer, STATE, state=await run_action(GET_STATE, {}))
+
+
+async def send_to_server(message_type, /, **payload):
+    """Send one message while holding the connection lock. False when not connected.
+
+    Command results are sent from their own tasks, the lock keeps two of them
+    from writing to the socket at the same time.
+    """
+    async with connection.lock:
+        if not connection.connected or connection.writer is None:
+            return False
+        await send_message(connection.writer, message_type, **payload)
+        return True
