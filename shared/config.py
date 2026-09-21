@@ -77,7 +77,8 @@ def save_config(config):
     path = get_config_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=4)
+        # the file is already utf-8, no need to escape it into \uXXXX
+        json.dump(config, f, indent=4, ensure_ascii=False)
     _config_cache = config
 
 

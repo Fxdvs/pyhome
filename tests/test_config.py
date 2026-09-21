@@ -65,6 +65,18 @@ def test_existing_id_is_kept(tmp):
     assert os.path.getmtime(path) == before, "a config with an id is not rewritten"
 
 
+def test_stamping_an_id_keeps_non_ascii_readable(tmp):
+    path = os.path.join(tmp, "kitchen.json")
+    write_json(path, {"NAME": "Kuchyňa"})
+    config.init(tmp, path)
+    config.get_config("ID")  # triggers the stamp-and-save on first load
+
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    assert "Kuchyňa" in raw, raw
+    assert "\\u" not in raw, raw
+
+
 def test_two_new_configs_get_different_ids(tmp):
     ids = []
     for name in ("a.json", "b.json"):
