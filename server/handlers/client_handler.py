@@ -24,8 +24,8 @@ def get_server_info():
     return {
         "id": get_config("ID"),
         "name": get_config("NAME"),
-        # not "type", that name belongs to the message envelope
-        "device_type": get_config("TYPE"),
+        # the config's TYPE, not "type", that name belongs to the message envelope
+        "role": get_config("TYPE"),
         "version": get_config("VERSION"),
         "host": get_config("HOST"),
         "port": get_config("PORT"),

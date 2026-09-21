@@ -14,6 +14,12 @@ HELLO = "hello"
 WELCOME = "welcome"
 # both ways, free text
 MESSAGE = "msg"
+# server -> client, run a device action
+CMD = "cmd"
+# client -> server, the answer to one cmd, matched by request_id
+RESULT = "result"
+# client -> server, device state sent unprompted
+STATE = "state"
 
 
 class ProtocolError(Exception):

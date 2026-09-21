@@ -89,7 +89,8 @@ async def handshake():
         writer, HELLO,
         id=get_config("ID"),
         name=get_config("NAME"),
-        device_type=get_config("TYPE"),
+        # the config's TYPE, client or server, "type" itself is the envelope field
+        role=get_config("TYPE"),
         version=get_config("VERSION"),
     )
 
