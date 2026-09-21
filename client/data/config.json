@@ -2,7 +2,7 @@
     "ID": "1",
     "NAME": "Client",
     "TYPE": "client",
-    "VERSION": "0.7",
+    "VERSION": "0.9",
     "HOST": "127.0.0.1",
     "PORT": 50000
 }

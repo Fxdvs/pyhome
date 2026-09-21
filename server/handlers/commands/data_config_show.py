@@ -14,4 +14,6 @@ async def function():
         ("Version:", get_config("VERSION")),
         ("Host/Address:", get_config("HOST")),
         ("Port:", get_config("PORT")),
+        ("Web host/Address:", get_config("WEB_HOST", "0.0.0.0")),
+        ("Web port:", get_config("WEB_PORT", 50001)),
     ])
