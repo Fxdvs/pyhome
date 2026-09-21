@@ -1,6 +1,6 @@
 import os
 
-from utils.symbols import SUCCESS, ERROR, QUESTION
+from shared.symbols import SUCCESS, ERROR, QUESTION
 from handlers.client_handler import CLIENTS_FILE
 
 command = ["data clients clear","data clients cls"]

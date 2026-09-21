@@ -1,4 +1,4 @@
-from utils.colors import GREEN, RESET
+from shared.colors import GREEN, RESET
 from handlers.connection_handler import get_connection_state, get_connection_lock
 
 command = ["send", "msg"]

@@ -1,7 +1,7 @@
 import asyncio
 import json
-from utils.config import get_config
-from utils.colors import GREEN, RED, RESET
+from shared.config import get_config
+from shared.colors import GREEN, RED, RESET
 
 HOST = get_config("HOST")
 PORT = get_config("PORT")

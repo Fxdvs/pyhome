@@ -1,35 +1,43 @@
 import os
+import sys
 import asyncio
 
-from utils.config import get_config
-from handlers.connection_handler import connect_to_server_async
-from handlers.command_handler import command_handler_async
-from handlers.message_handler import receive_messages_async
+# the shared package sits next to this folder, so put the repo root on the path
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(APP_DIR)
+sys.path.insert(0, ROOT_DIR)
+
+# config has to know which data folder is ours before anything reads it
+from shared import config  # noqa: E402
+config.init(APP_DIR)
+
+from shared.config import get_config  # noqa: E402
+from shared.command_handler import command_handler_async  # noqa: E402
+from handlers.connection_handler import connect_to_server_async  # noqa: E402
+from handlers.message_handler import receive_messages_async  # noqa: E402
 
 NAME = get_config("NAME")
 ID = get_config("ID")
 VERSION = get_config("VERSION")
+
+# commands are loaded from the shared folder first, then from our own
+COMMAND_SOURCES = [
+    (os.path.join(ROOT_DIR, "shared", "commands"), "shared.commands"),
+    (os.path.join(APP_DIR, "handlers", "commands"), "handlers.commands"),
+]
 
 # init app, both commands only exist on windows
 if os.name == "nt":
     os.system("color")
     os.system(f"title {NAME}#{ID} {VERSION}")
 
-# global vars
-CONNECTED = False
-reader = None
-writer = None
-server_info = {}
-
 # run handlers in parallel
 async def main():
-    global CONNECTED, reader, writer, server_info
-    
     # handlers
     await asyncio.gather(
         connect_to_server_async(),
         receive_messages_async(),
-        command_handler_async()
+        command_handler_async(COMMAND_SOURCES)
     )
 
 # main
@@ -42,7 +50,7 @@ if __name__ == "__main__":
         except ImportError:
             print("Using standard asyncio")
         asyncio.run(main())
-    
+
     except KeyboardInterrupt:
         print(f"\n{NAME} is shutting down.")
     except Exception as e:

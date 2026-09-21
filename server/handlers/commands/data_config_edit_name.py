@@ -1,8 +1,8 @@
 import os
 
-from utils.colors import GRAY, RESET
-from utils.symbols import SUCCESS, ERROR, QUESTION
-from utils.config import get_config, set_config
+from shared.colors import GRAY, RESET
+from shared.symbols import SUCCESS, ERROR, QUESTION
+from shared.config import get_config, set_config
 
 command = ["data config edit name","data conf edit name"]
 description = "Edits the server name"

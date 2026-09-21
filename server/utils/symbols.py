@@ -1,6 +1,0 @@
-from utils.colors import GREEN, RED, YELLOW, RESET
-
-SUCCESS = f"{GREEN}✔{RESET}"     
-ERROR = f"{RED}✘{RESET}"         
-WARNING = f"{RED}!{RESET}"    
-QUESTION = f"{YELLOW}?{RESET}" 

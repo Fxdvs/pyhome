@@ -1,7 +1,7 @@
 import json
 import os
 
-from utils.colors import GREEN, GRAY, RESET
+from shared.colors import GREEN, GRAY, RESET
 from handlers.client_handler import get_connected_clients, CLIENTS_FILE
 
 command = ["list", "ls"]
@@ -10,25 +10,25 @@ description = "List all clients"
 async def function():
     print("\n" + " " * 5 + "List of clients:")
     print(" " * 5 + f"{GRAY}{'─' * 50}{RESET}")
-    
+
     if not os.path.exists(CLIENTS_FILE):
         print(" " * 5 + "No clients found\n")
         return
-    
-    with open(CLIENTS_FILE, "r") as f:
+
+    with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
         try:
             clients = json.load(f)
         except json.JSONDecodeError:
             print(" " * 5 + "Error loading clients\n")
             return
-    
+
     if not clients:
         print(" " * 5 + "No clients found\n")
         return
-    
+
     # Get online clients
     connected_clients = get_connected_clients()
-    
+
     # id -> address of the client that is currently connected under that id
     online = {}
     for addr, client_data in connected_clients.items():

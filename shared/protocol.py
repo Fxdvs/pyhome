@@ -1,0 +1,45 @@
+"""Newline delimited JSON messages.
+
+TCP is a stream of bytes, not of messages: two sends can arrive merged and
+one send can arrive split. So every message is a single line of JSON ending
+in "\\n", and the reader reads exactly one line at a time.
+
+Every message is an object with a "type" field, the rest depends on the type.
+"""
+import json
+
+# client -> server, first message on a new connection
+HELLO = "hello"
+# server -> client, answer to hello
+WELCOME = "welcome"
+# both ways, free text
+MESSAGE = "msg"
+
+
+class ProtocolError(Exception):
+    """The peer sent something that is not a valid message."""
+
+
+async def send_message(writer, type, **payload):
+    line = json.dumps({"type": type, **payload}) + "\n"
+    writer.write(line.encode("utf-8"))
+    await writer.drain()
+
+
+async def read_message(reader):
+    """Read one message, or None when the peer closed the connection."""
+    line = await reader.readline()
+
+    # readline returns b"" only at end of stream, a blank line would be b"\n"
+    if not line:
+        return None
+
+    try:
+        message = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise ProtocolError(f"could not parse message: {e}") from e
+
+    if not isinstance(message, dict) or "type" not in message:
+        raise ProtocolError("message has no type")
+
+    return message

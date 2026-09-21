@@ -1,5 +1,5 @@
 import asyncio
-from utils.colors import GREEN, RESET
+from shared.colors import GREEN, RESET
 from handlers.connection_handler import (
     get_connection_state,
     set_connected,
