@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import os
 import asyncio
 from utils.symbols import ERROR
@@ -12,24 +13,18 @@ def load_commands():
             continue
         command_name = file[:-3]
         command_path = f"handlers.commands.{command_name}"
-        
+
         try:
             command = importlib.import_module(command_path)
             names = getattr(command, "command", [])
-            
+
             if isinstance(names, str):
                 names = [names]
             description = getattr(command, "description", "blank")
-            
-            # Find run function
-            run_func = None
-            for attr_name in dir(command):
-                attr = getattr(command, "function", None)
-                if callable(attr) and not attr_name.startswith("_"):
-                    run_func = attr
-                    break
-            
-            if run_func:
+
+            run_func = getattr(command, "function", None)
+
+            if callable(run_func):
                 for name in names:
                     commands[name.lower()] = {
                         "name": names[0].lower(),
@@ -37,10 +32,20 @@ def load_commands():
                         "description": description,
                         "run": run_func
                     }
-        
+
         except Exception as e:
             print(f"{ERROR} Failed to load command '{command_name}': {e}")
     return commands
+
+def match_command(commands, cmd_input):
+    """Some commands are several words long, so match the longest name first."""
+    lowered = cmd_input.lower()
+    for name in sorted(commands, key=len, reverse=True):
+        if lowered == name:
+            return name, []
+        if lowered.startswith(name + " "):
+            return name, cmd_input[len(name):].split()
+    return None, []
 
 async def command_handler_async():
     commands = load_commands()
@@ -48,23 +53,24 @@ async def command_handler_async():
     while True:
         try:
             # input without blocking
-            cmd = await loop.run_in_executor(None, input, "> ")
-            
-            if cmd.strip() == "":
+            cmd_input = await loop.run_in_executor(None, input, "> ")
+            cmd_input = cmd_input.strip()
+
+            if not cmd_input:
                 continue
 
-            if cmd.strip() in commands:
+            cmd, params = match_command(commands, cmd_input)
+
+            if cmd:
                 try:
                     # check if command is async
-                    import inspect
                     if inspect.iscoroutinefunction(commands[cmd]["run"]):
-                        await commands[cmd]["run"]()
+                        await commands[cmd]["run"](*params)
                     else:
-                        await loop.run_in_executor(None, commands[cmd]["run"])
+                        await loop.run_in_executor(None, commands[cmd]["run"], *params)
                 except Exception as e:
                     print(f"{ERROR} Error running command '{cmd}': {e}")
             else:
                 print(f"{ERROR} Unknown command. Type 'help' for list of commands.")
         except Exception as e:
             print(f"{ERROR} Command handler error: {e}")
-

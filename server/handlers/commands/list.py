@@ -2,12 +2,10 @@ import json
 import os
 
 from utils.colors import GREEN, GRAY, RESET
-from handlers.client_handler import get_connected_clients
+from handlers.client_handler import get_connected_clients, CLIENTS_FILE
 
 command = ["list", "ls"]
 description = "List all clients"
-
-CLIENTS_FILE = "data/clients.json"
 
 async def function():
     print("\n" + " " * 5 + "List of clients:")
@@ -31,19 +29,18 @@ async def function():
     # Get online clients
     connected_clients = get_connected_clients()
     
-    online_ids = set()
+    # id -> address of the client that is currently connected under that id
+    online = {}
     for addr, client_data in connected_clients.items():
-        online_ids.add(client_data.get("id"))
-    
+        online[client_data.get("id")] = f"{addr[0]}:{addr[1]}"
+
     # Display clients
     for i, client in enumerate(clients, 1):
         client_id = client.get("ID", "?")
         client_name = client.get("NAME", "Unknown")
-        
-        is_online = client_id in online_ids
-        if is_online:
-            ip, port = addr
-            print(" " * 5 + f"#{i} {GREEN}{client_name}#{client_id} ({ip}:{port}){RESET}")
+
+        if client_id in online:
+            print(" " * 5 + f"#{i} {GREEN}{client_name}#{client_id} ({online[client_id]}){RESET}")
         else:
             print(" " * 5 + f"#{i} {GRAY}{client_name}#{client_id}{RESET}")
     print()

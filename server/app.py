@@ -12,9 +12,10 @@ NAME = get_config("NAME")
 ID = get_config("ID")
 VERSION = get_config("VERSION")
 
-# init app
-os.system("color")
-os.system(f"title {NAME}#{ID} {VERSION}")
+# init app, both commands only exist on windows
+if os.name == "nt":
+    os.system("color")
+    os.system(f"title {NAME}#{ID} {VERSION}")
 
 # handle client connections
 async def accept_clients(server):

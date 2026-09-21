@@ -5,16 +5,19 @@ from utils.colors import GREEN, RED, RESET
 from utils.config import get_config
 from utils.console import print_message
 
-CLIENTS_FILE = "data/clients.json"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CLIENTS_FILE = os.path.join(BASE_DIR, "data", "clients.json")
 
-server_info = {
-    "id": get_config("ID"),
-    "name": get_config("NAME"),
-    "type": get_config("TYPE"),
-    "version": get_config("VERSION"),
-    "host": get_config("HOST"),
-    "port": get_config("PORT"),
-}
+# read at call time, so a renamed server is sent to clients right away
+def get_server_info():
+    return {
+        "id": get_config("ID"),
+        "name": get_config("NAME"),
+        "type": get_config("TYPE"),
+        "version": get_config("VERSION"),
+        "host": get_config("HOST"),
+        "port": get_config("PORT"),
+    }
 
 # global vars
 connected_clients = {}
@@ -56,7 +59,7 @@ async def handle_client_async(reader, writer):
         print_message(f"Client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET} has connected")
         
         # send information about server
-        writer.write(json.dumps(server_info).encode("utf-8"))
+        writer.write(json.dumps(get_server_info()).encode("utf-8"))
         await writer.drain()
         
         # receive messages

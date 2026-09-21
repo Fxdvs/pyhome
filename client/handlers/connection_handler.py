@@ -25,10 +25,11 @@ async def connect_to_server_async():
                 print("Attempting first connection...")
                 tried_first = True
             else:
-                if not auto_reconnect:
+                # nothing to do while connected or while auto reconnect is off
+                if CONNECTED or not auto_reconnect:
                     await asyncio.sleep(1)
                     continue
-            
+
             async with connection_lock:
                 if not CONNECTED:
                     # Connect to server

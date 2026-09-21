@@ -7,27 +7,27 @@ from utils.network import get_connection
 command = ["about", "self", "info"]
 description = "Information about the application"
 
-NAME = get_config("NAME")
-ID = get_config("ID")
-TYPE = get_config("TYPE")
-VERSION = get_config("VERSION")
-HOST = get_config("HOST")
-PORT = get_config("PORT")
-
 gap = 50
 margin = " " * 5
-name = f"{NAME}#{ID}"
 
 async def function():
+    # read at call time, the config changes while the server runs
+    name = get_config("NAME")
+    server_id = get_config("ID")
+    server_type = get_config("TYPE")
+    version = get_config("VERSION")
+    host = get_config("HOST")
+    port = get_config("PORT")
+
     status = f"{GREEN}True{RESET}" if get_connection() else f"{RED}False{RESET}"
-    
-    print("\n" + margin + f"{name}")
+    plain_status = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]').sub('', status)
+
+    print("\n" + margin + f"{name}#{server_id}")
     print(margin + f"{GRAY}{'─' * gap}{RESET}")
-    print(margin + f"{'Name:'.ljust(gap-len(NAME))}{NAME}")
-    print(margin + f"{'ID:'.ljust(gap-len(ID))}{ID}")
-    print(margin + f"{'Type:'.ljust(gap-len(TYPE))}{TYPE}")
-    print(margin + f"{'Version:'.ljust(gap-len(VERSION))}{VERSION}")
-    print(margin + f"{'Host/Address:'.ljust(gap-len(HOST))}{HOST}")
-    print(margin + f"{'Port:'.ljust(gap-len(str(PORT)))}{PORT}")
-    print(margin + f"{'Connected:'.ljust(gap-len(re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]').sub('', status)))}{status}\n")
-    
+    print(margin + f"{'Name:'.ljust(gap-len(name))}{name}")
+    print(margin + f"{'ID:'.ljust(gap-len(server_id))}{server_id}")
+    print(margin + f"{'Type:'.ljust(gap-len(server_type))}{server_type}")
+    print(margin + f"{'Version:'.ljust(gap-len(version))}{version}")
+    print(margin + f"{'Host/Address:'.ljust(gap-len(host))}{host}")
+    print(margin + f"{'Port:'.ljust(gap-len(str(port)))}{port}")
+    print(margin + f"{'Connected:'.ljust(gap-len(plain_status))}{status}\n")

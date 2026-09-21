@@ -5,14 +5,11 @@ from utils.config import get_config
 command = ["shutdown","exit","quit"]
 description = "Shuts down the server"
 
-NAME = get_config("NAME")
-ID = get_config("ID")
-
 def function():
     print(f"{QUESTION} Are you sure you want to shut down the server? (y/n)")
     accept = input(">").strip().lower()
     if accept == "y":
-        print(f"{RED}{NAME}#{ID}{RESET} is shutting down.")
+        print(f"{RED}{get_config('NAME')}#{get_config('ID')}{RESET} is shutting down.")
         exit(0)      
     else:
         print(f"{ERROR} Operation cancelled.")
