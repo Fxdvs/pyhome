@@ -15,6 +15,7 @@ config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
 from shared.colors import GREEN, RESET  # noqa: E402
 from shared.config import get_config  # noqa: E402
+from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
 from shared.network import get_local_ip  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
@@ -88,11 +89,12 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print(f"\n{NAME} is turned off.")
+    except SystemExit as e:
+        # sys.exit(1) etc reaches here too (uvicorn uses it on a bind failure);
+        # a clean shutdown (exit(0)) must close without a prompt
+        if e.code is not None and e.code != 0:
+            wait_for_enter()
+        raise
     except Exception as e:
         print(f"Fatal error: {e}")
-        # the launcher starts us without a batch file ending in pause,
-        # so without this the window closes before the error can be read
-        try:
-            input("Press Enter to close.")
-        except (EOFError, KeyboardInterrupt):
-            pass
+        wait_for_enter()

@@ -35,6 +35,18 @@ def print_message(message: str):
         sys.stdout.flush()
 
 
+def wait_for_enter():
+    """Blocks on Enter so the message above it can be read before the console closes.
+
+    The launcher starts apps without a batch file ending in pause, so
+    without this the window closes the instant the app ends.
+    """
+    try:
+        input("Press Enter to close.")
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def print_info(title, rows, gap=50, margin=" " * 5):
     """A titled block of label/value rows, values lined up at column `gap`."""
     print("\n" + margin + title)
