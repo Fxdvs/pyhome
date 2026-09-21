@@ -1,0 +1,7 @@
+# Store everything with LF in the repository and check it out with LF,
+# so the same file does not show up as changed on a different machine.
+* text=auto eol=lf
+
+# Batch files are read by cmd.exe, which wants CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
