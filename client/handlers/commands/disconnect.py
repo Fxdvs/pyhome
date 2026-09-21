@@ -1,17 +1,23 @@
-from handlers.connection_handler import set_connected, set_auto_reconnect, get_connection_state
+from handlers.connection_handler import connection
 
 command = ["disconnect", "dc"]
 description = "Disconnect from server"
 
 
 async def function():
-    _, _, writer, _ = get_connection_state()
-    
-    set_connected(False)
-    set_auto_reconnect(False)
-    
+    if not connection.connected:
+        print("Not connected to server")
+        return
+
+    # clear the flag first, so the receive loop treats the drop as intentional
+    connection.auto_reconnect = False
+    writer = connection.detach()
+
     if writer:
         writer.close()
-        await writer.wait_closed()
-    
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+
     print("Disconnected from server.")

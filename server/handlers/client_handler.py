@@ -2,9 +2,19 @@ import json
 import os
 import asyncio
 
-from shared.colors import GREEN, RED, RESET
+from shared.colors import GRAY, GREEN, RED, RESET
 from shared.config import get_config
 from shared.console import print_message
+from shared.protocol import (
+    HELLO,
+    MESSAGE,
+    WELCOME,
+    ProtocolError,
+    read_message,
+    send_message,
+)
+
+HANDSHAKE_TIMEOUT = 10
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLIENTS_FILE = os.path.join(BASE_DIR, "data", "clients.json")
@@ -14,7 +24,8 @@ def get_server_info():
     return {
         "id": get_config("ID"),
         "name": get_config("NAME"),
-        "type": get_config("TYPE"),
+        # not "type", that name belongs to the message envelope
+        "device_type": get_config("TYPE"),
         "version": get_config("VERSION"),
         "host": get_config("HOST"),
         "port": get_config("PORT"),
@@ -30,23 +41,19 @@ async def handle_client_async(reader, writer):
     client_id = None
 
     try:
-        # get client data
-        data = await reader.read(1024)
-        client_data = data.decode("utf-8")
+        # the client introduces itself first
+        hello = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)
 
-        if not client_data:
+        if hello is None:
             writer.close()
             await writer.wait_closed()
             return
 
-        # parse json
-        try:
-            client_info = json.loads(client_data)
-            client_id = client_info.get("id", "unknown")
-            client_name = client_info.get("name", "unknown")
-        except json.JSONDecodeError:
-            client_name = client_data
-            client_id = "unknown"
+        if hello["type"] != HELLO:
+            raise ProtocolError(f"expected '{HELLO}', got '{hello['type']}'")
+
+        client_id = hello.get("id", "unknown")
+        client_name = hello.get("name", "unknown")
 
         # store client
         async with clients_lock:
@@ -60,24 +67,29 @@ async def handle_client_async(reader, writer):
         print_message(f"Client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET} has connected")
 
         # send information about server
-        writer.write(json.dumps(get_server_info()).encode("utf-8"))
-        await writer.drain()
+        await send_message(writer, WELCOME, **get_server_info())
+
+        label = f"{addr[0]}:{addr[1]}@{client_name}#{client_id}"
 
         # receive messages
         while True:
-            try:
-                data = await asyncio.wait_for(reader.read(1024), timeout=5.0)
+            message = await read_message(reader)
 
-                if not data:
-                    break
-
-                message = data.decode("utf-8")
-                print_message(f"From client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {message}")
-
-            except asyncio.TimeoutError:
-                continue
-            except Exception:
+            # None means the client closed the connection
+            if message is None:
                 break
+
+            if message["type"] == MESSAGE:
+                text = message.get("text", "")
+                print_message(f"From client {GREEN}{label}{RESET}: {text}")
+            else:
+                print_message(f"{GRAY}Ignored '{message['type']}' from {label}{RESET}")
+
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+        pass
+
+    except ProtocolError as e:
+        print_message(f"Client {RED}{addr}{RESET} spoke badly: {e}")
 
     except Exception as e:
         print_message(f"Client {RED}{addr}@{client_name}#{client_id}{RESET} had a fatal error: {e}")

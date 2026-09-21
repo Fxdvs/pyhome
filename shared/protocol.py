@@ -20,8 +20,15 @@ class ProtocolError(Exception):
     """The peer sent something that is not a valid message."""
 
 
-async def send_message(writer, type, **payload):
-    line = json.dumps({"type": type, **payload}) + "\n"
+async def send_message(writer, message_type, /, **payload):
+    # message_type is positional only so that a payload field called
+    # "message_type" cannot collide with it
+    if "type" in payload:
+        raise ProtocolError(
+            "'type' is the envelope field, name the payload field something else"
+        )
+
+    line = json.dumps({"type": message_type, **payload}) + "\n"
     writer.write(line.encode("utf-8"))
     await writer.drain()
 

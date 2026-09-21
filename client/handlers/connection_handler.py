@@ -1,87 +1,104 @@
 import asyncio
-import json
-from shared.config import get_config
+
 from shared.colors import GREEN, RED, RESET
+from shared.config import get_config
+from shared.console import print_message
+from shared.protocol import HELLO, WELCOME, ProtocolError, read_message, send_message
 
-HOST = get_config("HOST")
-PORT = get_config("PORT")
-NAME = get_config("NAME")
-ID = get_config("ID")
+RETRY_SECONDS = 15
+HANDSHAKE_TIMEOUT = 10
 
-# global vars
-CONNECTED = False
-reader = None
-writer = None
-server_info = {}
-connection_lock = asyncio.Lock()
-auto_reconnect = False
+
+class Connection:
+    """The link to the server, and everything that describes it.
+
+    This used to be a handful of module globals with getters and setters.
+    Keeping it in one object means the state cannot drift apart: a socket is
+    never left behind on a connection that is marked as closed.
+    """
+
+    def __init__(self):
+        self.connected = False
+        self.reader = None
+        self.writer = None
+        self.server_info = {}
+        self.auto_reconnect = False
+        self.lock = asyncio.Lock()
+
+    def attach(self, reader, writer, server_info):
+        self.reader = reader
+        self.writer = writer
+        self.server_info = server_info
+        self.connected = True
+        self.auto_reconnect = False
+
+    def detach(self):
+        """Forget the socket and hand the writer back so the caller can close it."""
+        writer = self.writer
+        self.connected = False
+        self.reader = None
+        self.writer = None
+        return writer
+
+    @property
+    def label(self):
+        """host:port@name#id of the server, for printing."""
+        info = self.server_info
+        return (f"{info.get('host')}:{info.get('port')}"
+                f"@{info.get('name')}#{info.get('id')}")
+
+
+connection = Connection()
+
 
 async def connect_to_server_async():
-    global CONNECTED, reader, writer, server_info, auto_reconnect
     tried_first = False
+
     while True:
         try:
             if not tried_first:
                 print("Attempting first connection...")
                 tried_first = True
-            else:
+            elif connection.connected or not connection.auto_reconnect:
                 # nothing to do while connected or while auto reconnect is off
-                if CONNECTED or not auto_reconnect:
-                    await asyncio.sleep(1)
-                    continue
+                await asyncio.sleep(1)
+                continue
 
-            async with connection_lock:
-                if not CONNECTED:
-                    # Connect to server
-                    reader, writer = await asyncio.open_connection(HOST, PORT)
-                    
-                    # Send client info
-                    client_info = json.dumps({"id": ID, "name": NAME})
-                    writer.write(client_info.encode('utf-8'))
-                    await writer.drain()
-                    
-                    # Receive server info
-                    server_data = await reader.read(1024)
-                    server_info = json.loads(server_data.decode('utf-8'))
-                    
-                    CONNECTED = True
-                    auto_reconnect = False
-                    
-                    print(f"\nConnected to {GREEN}{server_info['host']}:{server_info['port']}@{server_info['name']}#{server_info['id']}{RESET}")
-        
-        except ConnectionRefusedError:
-            async with connection_lock:
-                CONNECTED = False
-            
-            print("Server unavailable or missing.")
-            # Ask user (in real scenario, you'd handle this better) todo
-            auto_reconnect = True
-            await asyncio.sleep(15)
-        
+            async with connection.lock:
+                if not connection.connected:
+                    await handshake()
+
+        except (OSError, ProtocolError, asyncio.TimeoutError) as e:
+            connection.connected = False
+            # keep trying, the server may simply not be up yet
+            connection.auto_reconnect = True
+            print_message(f"{RED}Server unavailable{RESET}: {e}")
+            await asyncio.sleep(RETRY_SECONDS)
+
         except Exception as e:
-            async with connection_lock:
-                CONNECTED = False
-            print(f"Fatal error: {e}")
-            await asyncio.sleep(15)
+            connection.connected = False
+            print_message(f"{RED}Fatal connection error{RESET}: {e}")
+            await asyncio.sleep(RETRY_SECONDS)
 
 
-def get_connection_state():
-    """Get connection state"""
-    return CONNECTED, reader, writer, server_info
+async def handshake():
+    """Open a connection, say hello, and wait for the server to answer."""
+    reader, writer = await asyncio.open_connection(get_config("HOST"), get_config("PORT"))
 
+    await send_message(
+        writer, HELLO,
+        id=get_config("ID"),
+        name=get_config("NAME"),
+        device_type=get_config("TYPE"),
+        version=get_config("VERSION"),
+    )
 
-def get_connection_lock():
-    """Get connection lock"""
-    return connection_lock
+    welcome = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)
 
+    if welcome is None:
+        raise ConnectionError("server closed the connection during the handshake")
+    if welcome["type"] != WELCOME:
+        raise ProtocolError(f"expected '{WELCOME}', got '{welcome['type']}'")
 
-def set_auto_reconnect(value):
-    """Set auto reconnect flag"""
-    global auto_reconnect
-    auto_reconnect = value
-
-
-def set_connected(value):
-    """Set connected flag"""
-    global CONNECTED
-    CONNECTED = value
+    connection.attach(reader, writer, welcome)
+    print_message(f"Connected to {GREEN}{connection.label}{RESET}")

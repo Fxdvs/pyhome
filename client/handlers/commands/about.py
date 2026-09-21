@@ -1,7 +1,7 @@
 from shared.colors import GREEN, RED, RESET
 from shared.config import get_config
 from shared.console import print_info
-from handlers.connection_handler import get_connection_state
+from handlers.connection_handler import connection
 
 command = ["about", "self", "info"]
 description = "Information about the application"
@@ -11,7 +11,7 @@ async def function():
     # read at call time, the config changes while the client runs
     name = get_config("NAME")
     client_id = get_config("ID")
-    status = f"{GREEN}True{RESET}" if get_connection_state()[0] else f"{RED}False{RESET}"
+    status = f"{GREEN}True{RESET}" if connection.connected else f"{RED}False{RESET}"
 
     print_info(f"{name}#{client_id}", [
         ("Name:", name),
