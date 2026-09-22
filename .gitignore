@@ -1,4 +1,4 @@
 **/__pycache__/
 
-# runtime state, the server rewrites this every time a client connects
-server/data/clients.json
+# runtime state, the server writes this next to whatever config it was started with
+server/**/clients.json
