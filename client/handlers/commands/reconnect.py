@@ -9,10 +9,8 @@ async def function():
     # a corrected TOKEN or address takes effect without restarting the client
     load_config(reload=True)
 
-    # under the lock, so a result being sent is not cut off halfway
-    async with connection.lock:
-        writer = connection.detach()
-        connection.auto_reconnect = True
+    writer = connection.detach()
+    connection.auto_reconnect = True
 
     if writer:
         writer.close()
