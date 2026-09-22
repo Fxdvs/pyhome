@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart home · Dashboard</title>
+<!--
+  Statický dashboard pre FastAPI web_handler. Dáta číta z GET /api/clients.
+  Server ju posiela na GET / (server/handlers/web_handler.py, FileResponse).
+
+  Očakávaný tvar odpovede (nepovinné polia sa zobrazia keď ich API doplní):
+      {"clients": [{"id","name","host","port","device","capabilities":[],"last_state":{}}]}
+  Keď fetch zlyhá: otvorený zo súboru ukáže ukážkové dáta s odznakom DEMO,
+  zo servera ukáže „Server nedostupný" a nechá posledné dáta.
+-->
+<style>
+  @keyframes drift1 { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(6%,-4%,0) scale(1.12); } }
+  @keyframes drift2 { 0%,100% { transform: translate3d(0,0,0) scale(1.05); } 50% { transform: translate3d(-7%,5%,0) scale(0.95); } }
+  @keyframes drift3 { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(4%,6%,0) scale(1.15); } }
+
+  :root {
+    --c1: #30d158;
+    --c2: #0a84ff;
+    --warm: #64d2ff;
+    --shadow: 10,132,255;
+    --ink: #1c1c1e;
+    --grad: linear-gradient(135deg, var(--c1), var(--c2));
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fbfbfd; color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
+  }
+  a { color: var(--c2); text-decoration: none; }
+  a:hover { color: var(--c1); }
+
+  .bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  .blob { position: absolute; border-radius: 50%; }
+  .b1 { width: 52vw; height: 52vw; left: -8vw; top: -14vw; filter: blur(90px); opacity: .85;
+        background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--c1) 60%, transparent), transparent 70%);
+        animation: drift1 18s ease-in-out infinite; }
+  .b2 { width: 46vw; height: 46vw; right: -6vw; top: 4vw; filter: blur(100px); opacity: .8;
+        background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--c2) 60%, transparent), transparent 70%);
+        animation: drift2 22s ease-in-out infinite; }
+  .b3 { width: 40vw; height: 40vw; left: 26vw; bottom: -16vw; filter: blur(110px); opacity: .7;
+        background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--warm) 55%, transparent), transparent 70%);
+        animation: drift3 26s ease-in-out infinite; }
+  .veil { position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 40%, rgba(255,255,255,0) 0%, rgba(251,251,253,.55) 62%, rgba(251,251,253,.92) 100%); }
+
+  .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 56px 28px 72px; }
+
+  .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+  .eyebrow { font-size: 13px; font-weight: 590; letter-spacing: .08em; text-transform: uppercase; color: rgba(28,28,30,.45); }
+  h1 { margin: 6px 0 0; font-size: 44px; line-height: 1.05; font-weight: 680; letter-spacing: -.025em; }
+  .pill { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 100px;
+          background: rgba(255,255,255,.55); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+          border: 1px solid rgba(255,255,255,.75); box-shadow: 0 6px 20px rgba(90,50,130,.08); font-size: 14px; font-weight: 560; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; box-shadow: 0 0 10px rgba(52,199,89,.7); }
+  .dot.off { background: #ff453a; box-shadow: 0 0 10px rgba(255,69,58,.7); }
+  .badge-demo { padding: 10px 16px; border-radius: 100px; font-size: 13px; font-weight: 620; letter-spacing: .05em;
+                color: #fff; background: var(--grad); box-shadow: 0 8px 24px rgba(var(--shadow), .3); }
+
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 18px; }
+  .card { padding: 24px; border-radius: 30px; background: rgba(255,255,255,.5);
+          backdrop-filter: blur(34px) saturate(180%); -webkit-backdrop-filter: blur(34px) saturate(180%);
+          border: 1px solid rgba(255,255,255,.7);
+          box-shadow: 0 10px 36px rgba(90,50,130,.1), inset 0 1px 0 rgba(255,255,255,.85);
+          display: flex; flex-direction: column; gap: 16px; }
+  .span2 { grid-column: span 2; }
+  .accent { color: #fff; border: 1px solid rgba(255,255,255,.35); background: var(--grad);
+            box-shadow: 0 14px 40px rgba(var(--shadow), .3), inset 0 1px 0 rgba(255,255,255,.45); }
+  .accent .eyebrow, .accent .sub { color: rgba(255,255,255,.78); }
+
+  .label { font-size: 13px; font-weight: 590; letter-spacing: .06em; text-transform: uppercase; color: rgba(28,28,30,.42); }
+  .name { font-size: 22px; font-weight: 620; letter-spacing: -.015em; }
+  .sub { font-size: 14px; color: rgba(28,28,30,.45); }
+  .metric { font-size: 44px; font-weight: 640; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .metric small { font-size: 16px; font-weight: 560; color: rgba(28,28,30,.4); letter-spacing: 0; }
+  .accent .metric small { color: rgba(255,255,255,.75); }
+
+  .icon { width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+          background: var(--grad); box-shadow: 0 8px 20px rgba(var(--shadow), .28); flex: none; }
+  .icon svg { width: 22px; height: 22px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 7px 13px; border-radius: 100px; font-size: 13px; font-weight: 560;
+          background: rgba(120,90,160,.1); border: 1px solid rgba(120,90,160,.14); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .rows { display: grid; gap: 10px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+  .row span:first-child { color: rgba(28,28,30,.45); }
+  .row span:last-child { font-weight: 590; font-variant-numeric: tabular-nums; }
+
+  .track { height: 44px; border-radius: 16px; background: rgba(120,90,160,.12);
+           box-shadow: inset 0 1px 3px rgba(80,40,120,.12); overflow: hidden; }
+  .fill { height: 100%; border-radius: 16px; background: linear-gradient(90deg, var(--warm), var(--c1)); transition: width .3s ease; }
+
+  .big { font-size: 52px; font-weight: 640; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 20px; font-weight: 560; color: rgba(28,28,30,.4); }
+  .switch { width: 56px; height: 32px; border-radius: 100px; padding: 3px; flex: none;
+            background: rgba(120,90,160,.2); transition: background .25s ease; }
+  .switch.on { background: linear-gradient(135deg, var(--warm), var(--c1)); }
+  .knob { width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+          transition: transform .25s ease; }
+  .switch.on .knob { transform: translateX(24px); }
+  .duo { display: flex; gap: 10px; }
+  .duo > div { flex: 1; padding: 12px 14px; border-radius: 14px; background: rgba(120,90,160,.1); }
+  .duo .k { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: rgba(28,28,30,.45); }
+  .duo .v { margin-top: 4px; font-size: 20px; font-weight: 620; font-variant-numeric: tabular-nums; }
+  .ok { font-size: 15px; font-weight: 560; color: #1d7a3a; }
+  .warn { font-size: 15px; font-weight: 560; color: #b35c00; }
+  .spacer { flex: 1; }
+
+  .empty { grid-column: 1 / -1; padding: 64px 28px; text-align: center; border-radius: 30px;
+           background: rgba(255,255,255,.45); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+           border: 1px dashed rgba(120,90,160,.28); }
+  .empty .name { margin-bottom: 6px; }
+
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } h1 { font-size: 34px; } .wrap { padding: 36px 18px 56px; } }
+  @media (max-width: 560px) { .grid { grid-template-columns: minmax(0,1fr); } .span2 { grid-column: span 1; } }
+</style>
+</head>
+<body>
+<div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="veil"></div></div>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <div class="eyebrow">Smart home · Server dashboard</div>
+      <h1>Pripojené zariadenia</h1>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">Načítavam…</span></div>
+      <div class="pill" id="updated">—</div>
+      <div class="badge-demo" id="demoBadge" style="display:none;">DEMO DÁTA</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card accent span2">
+      <div class="eyebrow">Prehľad</div>
+      <div class="metric" id="countMetric">0<small> klientov online</small></div>
+      <div class="sub" id="devicesSummary">Žiadne zariadenia</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Server</div>
+      <div class="name" id="serverName">FastAPI</div>
+      <div class="sub" id="serverHint">Read-only dashboard</div>
+      <div class="rows" id="serverRows"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">Typy zariadení</div>
+      <div class="chips" id="typeChips"><span class="chip">—</span></div>
+      <div class="sub">Podľa poľa <code>device</code> v hello</div>
+    </div>
+  </div>
+
+  <div class="label" style="margin:34px 0 14px;">Klienti</div>
+  <div class="grid" id="clients"></div>
+</div>
+
+<script>
+const ICONS = {
+  light: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 1 3.5 10.9V16h-7v-2.1A6 6 0 0 1 12 3z"/></svg>',
+  thermostat: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  generic: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg>'
+};
+
+const DEMO = [
+  { id: "a3f1b2c4", name: "kitchen", host: "192.168.1.24", port: 51431, device: "light",
+    capabilities: ["turn_on", "turn_off", "set_brightness"], last_state: { on: true, brightness: 72 } },
+  { id: "7d0e5519", name: "bedroom", host: "192.168.1.31", port: 51502, device: "thermostat",
+    capabilities: ["set_target", "get_state"], last_state: { target: 21.5, current: 20.2, heating: true } },
+  { id: "c18ba402", name: "hall", host: "192.168.1.9", port: 51544, device: "sensor",
+    capabilities: ["get_state"], last_state: { aqi: 38, humidity: "44 %", co2: "612 ppm" } }
+];
+
+const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function head(c, right) {
+  return `<div style="display:flex; align-items:flex-start; gap:16px; justify-content:space-between;">
+    <div style="min-width:0;">
+      <div class="label">${esc(c.name || "klient")} · ${esc(c.host || "?")}:${esc(c.port ?? "?")}</div>
+      <div class="name" style="margin-top:6px;">${esc(DEVICE_TITLES[c.device] || "Klient")}<span style="color:rgba(28,28,30,.35); font-weight:500; font-size:16px;"> #${esc(c.id || "?")}</span></div>
+    </div>
+    ${right || ""}
+  </div>`;
+}
+
+const DEVICE_TITLES = { light: "Svetlá", thermostat: "Vykurovanie", lock: "Zámok" };
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+
+/* Svetlo — veľké % a hrubý jasový pás (read-only) */
+function lightCard(c) {
+  const s = c.last_state || {};
+  const on = s.on === undefined ? null : !!s.on;
+  const b = num(s.brightness ?? s.level);
+  const shown = on === false ? 0 : (b === null ? 0 : b);
+  return `<div class="card span2" style="min-height:236px;">
+    ${head(c, `<div class="switch${on ? " on" : ""}"><div class="knob"></div></div>`)}
+    <div class="spacer"></div>
+    <div>
+      <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:12px;">
+        <span class="big">${b === null && on === null ? "—" : shown}</span><span class="unit">%</span>
+      </div>
+      <div class="track"><div class="fill" style="width:${Math.max(0, Math.min(100, shown))}%"></div></div>
+    </div>
+    ${capChips(c)}
+  </div>`;
+}
+
+/* Termostat — veľká teplota a dvojica hodnôt */
+function thermostatCard(c) {
+  const s = c.last_state || {};
+  const target = num(s.target ?? s.temperature ?? s.temp);
+  const current = num(s.current ?? s.reading);
+  return `<div class="card span2" style="min-height:236px;">
+    ${head(c, `<div class="icon">${ICONS.thermostat}</div>`)}
+    <div style="display:flex; align-items:baseline; gap:2px;">
+      <span class="big" style="font-size:60px;">${target === null ? "—" : target}</span><span class="unit" style="font-size:24px;">°</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="duo">
+      <div><div class="k">Cieľ</div><div class="v">${target === null ? "—" : target + "°"}</div></div>
+      <div><div class="k">Aktuálne</div><div class="v">${current === null ? "—" : current + "°"}</div></div>
+    </div>
+    <div class="${s.heating ? "warn" : "ok"}">${s.on === false ? "Vypnutý" : s.heating === undefined ? "Stav vykurovania neznámy" : (s.heating ? "Vykuruje" : "Nastavená teplota dosiahnutá")}</div>
+    ${capChips(c)}
+  </div>`;
+}
+
+/* Ostatné — štatistický panel v štýle karty kvality vzduchu */
+function statCard(c) {
+  const s = c.last_state || {};
+  const entries = Object.entries(s);
+  const lead = entries.find(([, v]) => Number.isFinite(Number(v)));
+  const rest = entries.filter(([k]) => !lead || k !== lead[0]);
+  return `<div class="card span2" style="min-height:236px;">
+    ${head(c, `<div class="chip">${c.device ? esc(c.device) : "bez zariadenia"}</div>`)}
+    ${lead
+      ? `<div><div class="metric">${esc(lead[1])}<small> ${esc(lead[0])}</small></div></div>`
+      : `<div class="sub">Stav ešte nebol vyžiadaný</div>`}
+    <div class="spacer"></div>
+    ${rest.length ? `<div class="rows">${rest.map(([k, v]) =>
+      `<div class="row"><span>${esc(k)}</span><span>${typeof v === "boolean" ? (v ? "áno" : "nie") : esc(v)}</span></div>`).join("")}</div>` : ""}
+    ${capChips(c)}
+  </div>`;
+}
+
+function capChips(c) {
+  const caps = c.capabilities || [];
+  return caps.length ? `<div class="chips">${caps.map((a) => `<span class="chip">${esc(a)}</span>`).join("")}</div>` : "";
+}
+
+function clientCard(c) {
+  if (c.device === "light") return lightCard(c);
+  if (c.device === "thermostat") return thermostatCard(c);
+  return statCard(c);
+}
+
+function render(clients, demo) {
+  document.getElementById("demoBadge").style.display = demo ? "" : "none";
+  document.getElementById("statusDot").className = "dot" + (clients.length ? "" : " off");
+  document.getElementById("statusText").textContent = clients.length
+    ? clients.length + (clients.length === 1 ? " klient online" : " klientov online")
+    : "Žiadny pripojený klient";
+  document.getElementById("updated").textContent = "Aktualizované " + new Date().toLocaleTimeString("sk-SK");
+
+  document.getElementById("countMetric").innerHTML =
+    clients.length + "<small> klientov online</small>";
+
+  const types = [...new Set(clients.map((c) => c.device).filter(Boolean))];
+  document.getElementById("devicesSummary").textContent = types.length
+    ? "Zariadenia: " + types.join(", ")
+    : "Žiadne zariadenie nedeklarovalo typ";
+  document.getElementById("typeChips").innerHTML = types.length
+    ? types.map((t) => `<span class="chip">${esc(t)}</span>`).join("")
+    : '<span class="chip">žiadne</span>';
+
+  const withDev = clients.filter((c) => c.device).length;
+  const caps = clients.reduce((n, c) => n + (c.capabilities || []).length, 0);
+  document.getElementById("serverRows").innerHTML = `
+    <div class="row"><span>Zdroj</span><span>${demo ? "demo" : "/api/clients"}</span></div>
+    <div class="row"><span>So zariadením</span><span>${withDev}</span></div>
+    <div class="row"><span>Akcie celkom</span><span>${caps}</span></div>`;
+
+  document.getElementById("clients").innerHTML = clients.length
+    ? clients.map(clientCard).join("")
+    : `<div class="empty"><div class="name">Žiadny pripojený klient</div>
+       <div class="sub">Spusti klienta cez launcher alebo <code>py app.py --config data/kitchen.json</code></div></div>`;
+}
+
+function showOffline() {
+  document.getElementById("demoBadge").style.display = "none";
+  document.getElementById("statusDot").className = "dot off";
+  document.getElementById("statusText").textContent = "Server nedostupný";
+  document.getElementById("updated").textContent = "Naposledy skúšané " + new Date().toLocaleTimeString("sk-SK");
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/api/clients", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    render(data.clients || [], false);
+  } catch (e) {
+    // demo data is for previewing the file from disk, from the server a failed
+    // fetch means the server is down and must not look like devices online
+    if (location.protocol === "file:") {
+      render(DEMO, true);
+    } else {
+      showOffline();
+    }
+  }
+}
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
