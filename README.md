@@ -41,7 +41,7 @@ clients:
 py app.py --config data/kitchen.json
 ```
 
-A new config file only needs `NAME` plus the network settings. If `ID` is
+A new config file only needs `NAME`, the network settings and, for a device, `DEVICE`. If `ID` is
 missing or empty, the first run generates one (8 hex characters) and writes it
 back into the file. When making a new config by copying an existing one,
 delete its `ID` line (or leave it empty) so the first run gives it a fresh
@@ -74,6 +74,7 @@ pyhome/
 │   ├── data/
 │   │   ├── config.json           server identity and network settings
 │   │   └── clients.json          every client seen so far, created at runtime
+│   ├── web/index.html            dashboard page, renders itself from /api/clients
 │   └── handlers/
 │       ├── server_handler.py     opens the TCP listener
 │       ├── client_handler.py     one coroutine per connected client
@@ -81,10 +82,12 @@ pyhome/
 │       └── commands/             server only commands
 ├── client/
 │   ├── app.py                    entry point
+│   ├── devices/                  one package per kind of device (light, thermostat)
 │   ├── data/config.json          client identity and which server to reach
 │   └── handlers/
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
+│       ├── device_handler.py     loads the device and runs its actions
 │       └── commands/             client only commands
 ├── tests/                        plain scripts, run all with py tests/run_all.py
 └── launcher.pyw                  GUI that starts and stops the server and clients
@@ -101,7 +104,8 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | --- | --- |
 | `ID` | identifier, sent during the handshake, generated on first run when empty |
 | `NAME` | display name |
-| `TYPE` | `server` or `client` |
+| `TYPE` | `server` or `client`, sent as `role` in the handshake |
+| `DEVICE` | client only, which device package to load from `client/devices/`, empty for none |
 | `VERSION` | version string, shown in the window title |
 | `HOST` | server: address to bind to. client: address to connect to |
 | `PORT` | TCP port, `50000` by default |
@@ -123,10 +127,12 @@ Type commands at the `>` prompt. Every command has aliases.
 | `data clients clear` | `data clients cls` | Clears the client list |
 | `data config edit name` | `data conf edit name` | Edits the server name |
 | `data config show` | `data conf show` | Shows formatted config.json |
+| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result |
 | `help` | `commands`, `?` | Lists all available commands |
 | `list` | `ls` | Lists all clients, online ones in green |
 | `send <id\|all> <message>` | `msg` | Sends a message to one client or to all |
 | `shutdown` | `exit`, `quit` | Shuts down the server |
+| `state <id>` | | Asks a client for its device state |
 
 **Client**
 
@@ -157,14 +163,40 @@ async def function(*params):         # may also be a plain def, params are optio
     ...
 ```
 
+### Adding a device
+
+A device is a package in `client/devices/<name>/`. The config's `DEVICE` names
+the folder. Its `__init__.py` declares module level names, the same way a
+command does:
+
+```python
+device = "light"
+description = "Dimmable light"
+
+async def turn_on(**params):
+    ...
+
+async def set_brightness(level=100, **params):
+    ...
+
+async def get_state():               # always available, returns a dict
+    return {"on": True, "brightness": 80}
+
+actions = [turn_on, set_brightness]  # what the server may ask for
+```
+
+The capabilities sent to the server are the names of the functions in
+`actions`. An action that raises is reported back as a failed result, the
+connection stays up.
+
 ## Web dashboard
 
 The server runs FastAPI on port `50001`:
 
 | Route | Description |
 | --- | --- |
-| `GET /` | HTML page listing the currently connected clients |
-| `GET /api/clients` | the same list as JSON |
+| `GET /` | the dashboard page (`server/web/index.html`), one card per connected client with its device, capabilities and last state, refreshed every 2 s |
+| `GET /api/clients` | the connected clients as JSON, which the page reads |
 
 ## Protocol
 
@@ -181,21 +213,28 @@ be added without breaking peers that do not know them yet.
 
 | Type | Direction | Fields |
 | --- | --- | --- |
-| `hello` | client to server | `id`, `name`, `device_type`, `version` |
-| `welcome` | server to client | `id`, `name`, `device_type`, `version`, `host`, `port` |
+| `hello` | client to server | `id`, `name`, `role`, `version`, `device`, `capabilities` |
+| `welcome` | server to client | `id`, `name`, `role`, `version`, `host`, `port` |
 | `msg` | both ways | `text` |
+| `cmd` | server to client | `action`, `params`, `request_id` |
+| `result` | client to server | `request_id`, `ok`, `state` or `error` |
+| `state` | client to server | `state`, sent unprompted, once after connecting |
 
 A connection goes:
 
 1. The client opens a connection to `HOST:PORT`.
 2. The client sends `hello`.
 3. The server answers with `welcome`.
-4. Both sides exchange `msg` until one of them closes the connection.
+4. Both sides exchange messages until one of them closes the connection. The
+   server may send `cmd` at any time and the client answers each with a
+   `result` carrying the same `request_id`, so several commands can be in
+   flight at once.
 
-`type` is the envelope field, so a payload field never uses that name. The kind
-of device travels as `device_type`.
+`type` is the envelope field, so a payload field never uses that name. The
+config's `TYPE` travels as `role`.
 
-The server stores every client it has seen in `data/clients.json`.
+The server stores every client it has seen in `clients.json` next to its
+config file. Device state is kept in memory only.
 
 ## Tests
 
@@ -215,8 +254,8 @@ py tests/run_all.py
 
 1. ~~A typed, newline framed message protocol shared by both sides~~
 2. ~~Server to client messaging, addressed by client id~~
-3. Per instance configuration so one checkout can run several clients
-4. Device modules, so a client can declare what it is and what it can do
+3. ~~Per instance configuration so one checkout can run several clients~~
+4. ~~Device modules, so a client can declare what it is and what it can do~~
 5. Authentication during the handshake
 
 Items 3 to 5 are v1.0 and are specified in
