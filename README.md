@@ -7,7 +7,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `0.9`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.0`, see [Known limitations](#known-limitations).
 
 ## Requirements
 
@@ -46,6 +46,10 @@ missing or empty, the first run generates one (8 hex characters) and writes it
 back into the file. When making a new config by copying an existing one,
 delete its `ID` line (or leave it empty) so the first run gives it a fresh
 one; the launcher refuses configs that share an ID.
+
+To keep strangers out, put the same `TOKEN` in the server's config and in every
+client's config. A client with a missing or different token is refused with the
+reason, and it stops retrying until you fix its config and type `reconnect`.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:
@@ -109,6 +113,7 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `VERSION` | version string, shown in the window title |
 | `HOST` | server: address to bind to. client: address to connect to |
 | `PORT` | TCP port, `50000` by default |
+| `TOKEN` | shared secret, the client sends it in `hello`. On the server, empty means every client is accepted, with a warning at startup |
 | `WEB_HOST` | server only, address the dashboard binds to |
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 
@@ -142,7 +147,7 @@ Type commands at the `>` prompt. Every command has aliases.
 | `clear` | `cls` | Clears the console |
 | `disconnect` | `dc` | Disconnect from server |
 | `help` | `commands`, `?` | Lists all available commands |
-| `reconnect` | `rc` | Reconnect to server |
+| `reconnect` | `rc` | Reconnect to server, re-reading the config first |
 | `send [message]` | `msg` | Send message to server, asks for it if omitted |
 | `shutdown` | `exit`, `quit` | Shuts down the application |
 
@@ -213,8 +218,9 @@ be added without breaking peers that do not know them yet.
 
 | Type | Direction | Fields |
 | --- | --- | --- |
-| `hello` | client to server | `id`, `name`, `role`, `version`, `device`, `capabilities` |
+| `hello` | client to server | `id`, `name`, `role`, `version`, `device`, `capabilities`, `token` |
 | `welcome` | server to client | `id`, `name`, `role`, `version`, `host`, `port` |
+| `denied` | server to client | `reason`, the server closes the connection after it |
 | `msg` | both ways | `text` |
 | `cmd` | server to client | `action`, `params`, `request_id` |
 | `result` | client to server | `request_id`, `ok`, `state` or `error` |
@@ -224,7 +230,7 @@ A connection goes:
 
 1. The client opens a connection to `HOST:PORT`.
 2. The client sends `hello`.
-3. The server answers with `welcome`.
+3. The server answers with `welcome`, or with `denied` and closes when it has a `TOKEN` and the client's does not match.
 4. Both sides exchange messages until one of them closes the connection. The
    server may send `cmd` at any time and the client answers each with a
    `result` carrying the same `request_id`, so several commands can be in
@@ -246,8 +252,11 @@ py tests/run_all.py
 
 ## Known limitations
 
-- **No authentication.** The TCP listener and the dashboard both bind to
-  `0.0.0.0` and accept anyone who can reach them.
+- **The token is not encryption.** It travels in plain text over a plain TCP
+  socket. It keeps a neighbour or a stray device on the same network out, it
+  does not stop anyone who can watch the traffic.
+- **The dashboard needs no token.** It is read only, but anyone who can reach
+  its port sees every connected device and its state.
 - **Clients are not addressable by name.** `send` takes an id or `all`.
 
 ## Roadmap
@@ -256,7 +265,7 @@ py tests/run_all.py
 2. ~~Server to client messaging, addressed by client id~~
 3. ~~Per instance configuration so one checkout can run several clients~~
 4. ~~Device modules, so a client can declare what it is and what it can do~~
-5. Authentication during the handshake
+5. ~~Authentication during the handshake~~
 
 Items 3 to 5 are v1.0 and are specified in
 [docs/v1.0-spec.md](docs/v1.0-spec.md).
