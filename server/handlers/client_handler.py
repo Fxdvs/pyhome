@@ -49,6 +49,17 @@ clients_lock = asyncio.Lock()
 pending_requests = {}
 
 
+def printable(value, limit=40):
+    """str(value) with unprintable characters dropped and truncated to limit.
+
+    Used for values an unauthenticated peer controls, before they are printed.
+    """
+    text = "".join(ch for ch in str(value) if ch.isprintable())
+    if len(text) > limit:
+        text = text[:limit] + "…"
+    return text
+
+
 def clean_capabilities(value):
     """The client's action names. Anything that is not a list of strings is dropped."""
     if not isinstance(value, list):
@@ -110,7 +121,7 @@ async def handle_client_async(reader, writer):
         # refuse before the client is registered or saved, and never print the token
         reason = check_token(hello)
         if reason is not None:
-            print_message(f"Refused {RED}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {reason}")
+            print_message(f"Refused {RED}{addr[0]}:{addr[1]}@{printable(client_name)}#{printable(client_id)}{RESET}: {reason}")
             await send_message(writer, DENIED, reason=reason)
             return
 

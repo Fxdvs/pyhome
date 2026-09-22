@@ -106,6 +106,18 @@ def test_refused_client_is_not_registered(tmp):
     assert "guess" not in out and "s3cret" not in out, "the token must never be printed"
 
 
+def test_refused_client_name_is_sanitized(tmp):
+    evil_name = "\x1b[31mevil" + "x" * 100
+
+    async def scenario(port):
+        return await talk(port, {"id": "bad", "name": evil_name, "token": "guess"})
+
+    (answer, after), out = run_server(tmp, scenario, TOKEN="s3cret")
+    assert answer == {"type": "denied", "reason": "wrong token"}, answer
+    assert "\x1b[31m" not in out, "an escape sequence from the peer must not reach the terminal"
+    assert "x" * 100 not in out, "an oversized name must be truncated"
+
+
 def test_accepted_client_gets_welcome(tmp):
     async def scenario(port):
         answer, _ = await talk(port, {"id": "good", "name": "Good", "token": "s3cret"})
