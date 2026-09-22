@@ -1,6 +1,7 @@
 import json
 import os
 import asyncio
+import hmac
 from uuid import uuid4
 
 from shared.colors import GRAY, GREEN, RED, RESET
@@ -8,6 +9,7 @@ from shared.config import get_config, get_config_path
 from shared.console import print_message
 from shared.protocol import (
     CMD,
+    DENIED,
     HELLO,
     MESSAGE,
     RESULT,
@@ -60,6 +62,31 @@ def clean_device(value):
         return value
     return None
 
+
+def check_token(hello):
+    """None when the client may stay, otherwise the reason it is refused."""
+    expected = get_config("TOKEN")
+    # no token on the server keeps every existing client working after an upgrade
+    if not expected:
+        return None
+
+    given = hello.get("token")
+    if not isinstance(given, str) or not given:
+        return "this server needs a token, set TOKEN in the client's config"
+
+    # compare_digest takes as long for a near miss as for a wild guess
+    if not hmac.compare_digest(given.encode("utf-8"), str(expected).encode("utf-8")):
+        return "wrong token"
+    return None
+
+
+def token_warning():
+    """The startup warning for a server that lets everyone in, or None."""
+    if get_config("TOKEN"):
+        return None
+    return "No TOKEN set, every client that can reach this server is accepted"
+
+
 async def handle_client_async(reader, writer):
     addr = writer.get_extra_info('peername')
     client_name = None
@@ -79,6 +106,13 @@ async def handle_client_async(reader, writer):
 
         client_id = hello.get("id", "unknown")
         client_name = hello.get("name", "unknown")
+
+        # refuse before the client is registered or saved, and never print the token
+        reason = check_token(hello)
+        if reason is not None:
+            print_message(f"Refused {RED}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET}: {reason}")
+            await send_message(writer, DENIED, reason=reason)
+            return
 
         # store client
         async with clients_lock:

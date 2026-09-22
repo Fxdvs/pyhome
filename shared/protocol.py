@@ -20,6 +20,8 @@ CMD = "cmd"
 RESULT = "result"
 # client -> server, device state sent unprompted
 STATE = "state"
+# server -> client, the hello was refused, the server closes after sending it
+DENIED = "denied"
 
 
 class ProtocolError(Exception):

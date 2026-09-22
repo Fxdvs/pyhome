@@ -20,5 +20,6 @@ async def function():
         ("Version:", get_config("VERSION")),
         ("Host/Address:", get_config("HOST")),
         ("Port:", get_config("PORT")),
+        ("Token:", "set" if get_config("TOKEN") else f"{RED}not set{RESET}"),
         ("Connected:", status),
     ])
