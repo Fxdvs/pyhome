@@ -89,6 +89,15 @@ def test_clean_capabilities(tmp):
     assert client_handler.clean_capabilities("turn_on") == []
 
 
+def test_clean_device(tmp):
+    assert client_handler.clean_device("light") == "light"
+    assert client_handler.clean_device({"a": 1}) is None
+    assert client_handler.clean_device(["light"]) is None
+    assert client_handler.clean_device(5) is None
+    assert client_handler.clean_device("") is None
+    assert client_handler.clean_device(None) is None
+
+
 def test_result_completes_the_command(tmp):
     reset()
     writer = add_client(LAMP, "lamp")
@@ -222,6 +231,27 @@ def test_unknown_type_is_ignored(tmp):
     with contextlib.redirect_stdout(io.StringIO()):
         client_handler.handle_message(LAMP, "lamp", {"type": "bogus"})
     assert LAMP in client_handler.connected_clients
+
+
+def test_truthy_but_not_true_ok_does_not_update_state(tmp):
+    reset()
+    add_client(LAMP, "lamp")
+    client_handler.connected_clients[LAMP]["last_state"] = {"on": True}
+    with contextlib.redirect_stdout(io.StringIO()):
+        # "false" and 1 are truthy in python but must not count as ok
+        client_handler.handle_message(LAMP, "lamp", {
+            "type": "result", "request_id": "gone1234", "ok": "false", "state": {"on": False}})
+    assert client_handler.connected_clients[LAMP]["last_state"] == {"on": True}
+
+
+def test_unhashable_request_id_does_not_raise(tmp):
+    reset()
+    add_client(LAMP, "lamp")
+    with contextlib.redirect_stdout(io.StringIO()):
+        # an unhashable request_id must not blow up the lookup and drop the client
+        client_handler.handle_message(LAMP, "lamp", {
+            "type": "result", "request_id": ["x"], "ok": True, "state": {}})
+    assert client_handler.pending_requests == {}
 
 
 def test_clients_file_sits_next_to_the_config(tmp):

@@ -53,6 +53,13 @@ def clean_capabilities(value):
         return []
     return [name for name in value if isinstance(name, str)]
 
+
+def clean_device(value):
+    """The client's device name. Anything but a non-empty string is dropped."""
+    if isinstance(value, str) and value:
+        return value
+    return None
+
 async def handle_client_async(reader, writer):
     addr = writer.get_extra_info('peername')
     client_name = None
@@ -79,7 +86,7 @@ async def handle_client_async(reader, writer):
                 "name": client_name,
                 "id": client_id,
                 "writer": writer,
-                "device": hello.get("device"),
+                "device": clean_device(hello.get("device")),
                 "capabilities": clean_capabilities(hello.get("capabilities")),
                 # only in memory, the client can be asked again after a restart
                 "last_state": None,
@@ -167,7 +174,7 @@ def handle_message(addr, label, message):
         if not resolve_request(addr, message):
             print_message(f"{GRAY}Result from {label} that nobody is waiting for{RESET}")
         state = message.get("state")
-        if message.get("ok") and isinstance(state, dict):
+        if message.get("ok") is True and isinstance(state, dict):
             connected_clients[addr]["last_state"] = state
 
     elif message_type == STATE:
@@ -182,7 +189,11 @@ def handle_message(addr, label, message):
 
 def resolve_request(addr, message):
     """Complete the request this result answers. False when nothing is waiting for it."""
-    entry = pending_requests.get(message.get("request_id"))
+    request_id = message.get("request_id")
+    # a request_id we handed out is always a str; anything else cannot be a hit
+    if not isinstance(request_id, str):
+        return False
+    entry = pending_requests.get(request_id)
     # an answer from another client, or to a request that already timed out
     if entry is None or entry[0] != addr or entry[1].done():
         return False
