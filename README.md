@@ -11,7 +11,7 @@ Both sides run as a console application with their own command prompt.
 
 ## Requirements
 
-- Python 3.9 or newer
+- Python 3.10 or newer
 - `fastapi` and `uvicorn`, for the server. The client needs nothing beyond the
   standard library.
 
@@ -41,7 +41,8 @@ clients:
 py app.py --config data/kitchen.json
 ```
 
-A new config file only needs `NAME`, the network settings and, for a device, `DEVICE`. If `ID` is
+A new config file only needs `NAME`, the network settings and, for a device, `DEVICE`, and
+`TOKEN` when the server has one. If `ID` is
 missing or empty, the first run generates one (8 hex characters) and writes it
 back into the file. When making a new config by copying an existing one,
 delete its `ID` line (or leave it empty) so the first run gives it a fresh
@@ -49,7 +50,20 @@ one; the launcher refuses configs that share an ID.
 
 To keep strangers out, put the same `TOKEN` in the server's config and in every
 client's config. A client with a missing or different token is refused with the
-reason, and it stops retrying until you fix its config and type `reconnect`.
+reason, and it stops retrying until you fix its config and type `reconnect` (which
+re-reads the config, so a corrected `TOKEN` or address takes effect right away; a
+changed `DEVICE` still needs a restart).
+
+Generate a strong token with:
+
+```
+py -c "import secrets; print(secrets.token_urlsafe(16))"
+```
+
+Upgrade every client before setting `TOKEN` on the server: an older client does
+not understand `denied` and keeps retrying instead of showing the reason.
+`client/data/config.json` and `server/data/config.json` are tracked in git, so a
+real token put there shows up in `git diff`. Keep real tokens out of commits.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:
