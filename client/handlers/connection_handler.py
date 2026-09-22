@@ -99,6 +99,9 @@ async def handshake():
     """Open a connection, say hello, and wait for the server to answer."""
     reader, writer = await asyncio.open_connection(get_config("HOST"), get_config("PORT"))
 
+    # a numeric TOKEN in config.json is still a token, the server compares strings
+    token = get_config("TOKEN")
+
     try:
         await send_message(
             writer, HELLO,
@@ -109,7 +112,7 @@ async def handshake():
             device=get_config("DEVICE") or None,
             capabilities=get_capabilities(),
             version=get_config("VERSION"),
-            token=get_config("TOKEN") or None,
+            token=str(token) if token else None,
         )
 
         welcome = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)

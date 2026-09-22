@@ -14,8 +14,8 @@ sys.path.insert(0, ROOT_DIR)
 
 from shared import config  # noqa: E402
 from shared.protocol import read_message, send_message  # noqa: E402
-from handlers import connection_handler  # noqa: E402
-from handlers.commands import disconnect, reconnect  # noqa: E402
+from handlers import connection_handler, message_handler  # noqa: E402
+from handlers.commands import reconnect  # noqa: E402
 from helpers import run_tests  # noqa: E402
 
 WELCOME = {"type": "welcome", "id": "s", "name": "Server", "role": "server",
@@ -30,8 +30,10 @@ class FakeServer:
         self.reply = reply
         self.hellos = []
         self.hung_up = 0
+        self.writers = []
 
     async def handle(self, reader, writer):
+        self.writers.append(writer)
         hello = await read_message(reader)
         self.hellos.append(hello)
         reply = dict(self.reply)
@@ -41,9 +43,30 @@ class FakeServer:
         self.hung_up += 1
         writer.close()
 
-    async def start(self):
-        self.server = await asyncio.start_server(self.handle, "127.0.0.1", 0)
+    async def start(self, port=0):
+        # rebinding the port right after a previous listener on it closed can
+        # briefly fail on Windows, so give it a moment rather than change app code
+        for attempt in range(20):
+            try:
+                self.server = await asyncio.start_server(self.handle, "127.0.0.1", port)
+                break
+            except OSError:
+                if attempt == 19:
+                    raise
+                await asyncio.sleep(0.1)
         return self.server.sockets[0].getsockname()[1]
+
+    async def kill(self):
+        """Simulate the server going down: close every accepted client, then stop listening.
+
+        Writers must close before wait_closed(), which since Python 3.12 also
+        waits for accepted connections to finish; closing the listener first
+        would deadlock against a still open connection.
+        """
+        for writer in self.writers:
+            writer.close()
+        self.server.close()
+        await self.server.wait_closed()
 
 
 def use_client_config(tmp, port, **values):
@@ -114,6 +137,20 @@ def test_no_token_sends_null(tmp):
 
     hello, _ = quietly(scenario())
     assert "token" in hello and hello["token"] is None, hello
+
+
+def test_numeric_token_is_sent_as_string(tmp):
+    reset()
+
+    async def scenario():
+        server = FakeServer(WELCOME)
+        use_client_config(tmp, await server.start(), TOKEN=12345)
+        await connection_handler.handshake()
+        await hang_up()
+        return server.hellos[0]
+
+    hello, _ = quietly(scenario())
+    assert hello["token"] == "12345", hello
 
 
 def test_denied_raises_and_closes(tmp):
@@ -206,29 +243,49 @@ def test_unexpected_error_keeps_retrying(tmp):
     assert connection_handler.connection.auto_reconnect is True
 
 
-def test_disconnect_waits_for_the_lock(tmp):
+def test_server_restart_is_noticed_once_and_reconnects(tmp):
     reset()
 
     async def scenario():
         server = FakeServer(WELCOME)
-        use_client_config(tmp, await server.start())
-        await connection_handler.handshake()
+        port = await server.start()
+        use_client_config(tmp, port)
 
-        lock = connection_handler.connection.lock
-        await lock.acquire()
-        task = asyncio.create_task(disconnect.function())
-        await asyncio.sleep(0.2)
-        # a writer mid send holds the lock, disconnect must not pull the socket away
-        still_connected = connection_handler.connection.connected
-        lock.release()
-        await task
-        await until(lambda: server.hung_up == 1)
-        return still_connected
+        original_retry = connection_handler.RETRY_SECONDS
+        connection_handler.RETRY_SECONDS = 0.2
+        connect_task = asyncio.create_task(connection_handler.connect_to_server_async())
+        receive_task = asyncio.create_task(message_handler.receive_messages_async())
+        new_server = None
+        try:
+            await until(lambda: connection_handler.connection.connected)
 
-    still_connected, _ = quietly(scenario())
-    assert still_connected is True
-    assert connection_handler.connection.connected is False
-    assert connection_handler.connection.auto_reconnect is False
+            # take the server down under the live client
+            await server.kill()
+            await asyncio.sleep(1.5)
+
+            # a new server takes its place on the same port, the client should find it
+            new_server = FakeServer(WELCOME)
+            await new_server.start(port)
+
+            await until(lambda: connection_handler.connection.connected, seconds=10)
+
+            return list(new_server.hellos)
+        finally:
+            connection_handler.RETRY_SECONDS = original_retry
+            connect_task.cancel()
+            receive_task.cancel()
+            for task in (connect_task, receive_task):
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+            # hang up the client before killing the second server, closing the
+            # listener first would deadlock against the still open connection
+            await hang_up()
+            if new_server is not None:
+                await new_server.kill()
+
+    hellos, out = quietly(scenario())
+    assert len(hellos) == 1, "the second server should get exactly one hello"
+    assert out.count("Connection closed by server") == 1, out
 
 
 if __name__ == "__main__":
