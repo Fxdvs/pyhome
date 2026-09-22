@@ -70,12 +70,15 @@ async def handle_command(message):
     else:
         print_message(f"{RED}Could not run {action}{RESET}: {reply['error']}")
 
+    reason = None
     try:
         sent = await send_to_server(RESULT, request_id=message.get("request_id"), **reply)
-    except OSError:
+    except Exception as e:
         sent = False
+        reason = str(e)
     if not sent:
-        print_message(f"{RED}Result of {action} could not be sent{RESET}")
+        detail = f": {reason}" if reason else ""
+        print_message(f"{RED}Result of {action} could not be sent{RESET}{detail}")
 
 
 def handle_drop(reason):

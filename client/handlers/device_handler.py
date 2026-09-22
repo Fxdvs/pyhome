@@ -14,6 +14,7 @@ now, the signature takes the folder so that can grow later.
 """
 import importlib
 import inspect
+import json
 import os
 
 GET_STATE = "get_state"
@@ -34,7 +35,7 @@ def load_device(devices_dir, package, name):
         return None
 
     # a plain folder name, so DEVICE cannot reach into other modules
-    if not name.isidentifier() or not os.path.isdir(os.path.join(devices_dir, name)):
+    if not isinstance(name, str) or not name.isidentifier() or not os.path.isdir(os.path.join(devices_dir, name)):
         raise ValueError(f"device '{name}' not found in {devices_dir}")
 
     module = importlib.import_module(f"{package}.{name}")
@@ -92,6 +93,12 @@ async def execute(name, params):
     try:
         await run_action(name, params)
         state = await _call(_device.get_state, {})
+        # a state the device handed us but json cannot carry would otherwise
+        # blow up inside send_message, deep in a task nobody awaits
+        try:
+            json.dumps(state)
+        except (TypeError, ValueError) as e:
+            return {"ok": False, "error": f"device state is not JSON: {e}"}
         return {"ok": True, "state": state}
     except Exception as e:
         return {"ok": False, "error": str(e)}

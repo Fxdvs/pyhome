@@ -108,6 +108,14 @@ def test_thermostat_heats_below_target(tmp):
     assert reply["ok"] is False and "5 to 30" in reply["error"], reply
 
 
+def test_non_string_device_raises(tmp):
+    try:
+        device_handler.load_device(DEVICES_DIR, "devices", 5)
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError for a non-string DEVICE")
+
+
 def test_missing_device_raises(tmp):
     for name in ("toaster", "../light", "light.sub"):
         try:
@@ -132,6 +140,22 @@ def test_device_breaking_the_contract_raises(tmp):
             except ValueError:
                 continue
             raise AssertionError(f"expected ValueError for {name}")
+    finally:
+        sys.path.remove(tmp)
+
+
+def test_non_json_state_fails_cleanly(tmp):
+    devices = os.path.join(tmp, "bad_state_devices")
+    write(os.path.join(devices, "__init__.py"), "")
+    write(os.path.join(devices, "oddstate", "__init__.py"),
+          "async def turn_on(**params):\n    pass\n"
+          "async def get_state():\n    return {'when': {1, 2}}\n"
+          "actions = [turn_on]\n")
+    sys.path.insert(0, tmp)
+    try:
+        device_handler.load_device(devices, "bad_state_devices", "oddstate")
+        reply = run(device_handler.execute("turn_on", {}))
+        assert reply["ok"] is False and "JSON" in reply["error"], reply
     finally:
         sys.path.remove(tmp)
 
