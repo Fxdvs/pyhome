@@ -1,13 +1,17 @@
 import asyncio
 
 from shared.colors import GREEN, RED, RESET
-from shared.config import get_config
+from shared.config import get_config, get_config_path
 from shared.console import print_message
-from shared.protocol import HELLO, STATE, WELCOME, ProtocolError, read_message, send_message
+from shared.protocol import DENIED, HELLO, STATE, WELCOME, ProtocolError, read_message, send_message
 from handlers.device_handler import GET_STATE, get_capabilities, get_device, run_action
 
 RETRY_SECONDS = 15
 HANDSHAKE_TIMEOUT = 10
+
+
+class AccessDenied(Exception):
+    """The server refused our hello. Retrying with the same token cannot help."""
 
 
 class Connection:
@@ -69,6 +73,13 @@ async def connect_to_server_async():
                 if not connection.connected:
                     await handshake()
 
+        except AccessDenied as e:
+            connection.connected = False
+            # the same token would be refused again, wait for the user instead
+            connection.auto_reconnect = False
+            print_message(f"{RED}Refused by the server{RESET}: {e}. "
+                          f"Fix TOKEN in {get_config_path()}, then type 'reconnect'.")
+
         except (OSError, ProtocolError, asyncio.TimeoutError) as e:
             connection.connected = False
             # keep trying, the server may simply not be up yet
@@ -78,6 +89,8 @@ async def connect_to_server_async():
 
         except Exception as e:
             connection.connected = False
+            # an unexpected error is no reason to stop trying for good
+            connection.auto_reconnect = True
             print_message(f"{RED}Fatal connection error{RESET}: {e}")
             await asyncio.sleep(RETRY_SECONDS)
 
@@ -86,23 +99,31 @@ async def handshake():
     """Open a connection, say hello, and wait for the server to answer."""
     reader, writer = await asyncio.open_connection(get_config("HOST"), get_config("PORT"))
 
-    await send_message(
-        writer, HELLO,
-        id=get_config("ID"),
-        name=get_config("NAME"),
-        # the config's TYPE, client or server, "type" itself is the envelope field
-        role=get_config("TYPE"),
-        device=get_config("DEVICE") or None,
-        capabilities=get_capabilities(),
-        version=get_config("VERSION"),
-    )
+    try:
+        await send_message(
+            writer, HELLO,
+            id=get_config("ID"),
+            name=get_config("NAME"),
+            # the config's TYPE, client or server, "type" itself is the envelope field
+            role=get_config("TYPE"),
+            device=get_config("DEVICE") or None,
+            capabilities=get_capabilities(),
+            version=get_config("VERSION"),
+            token=get_config("TOKEN") or None,
+        )
 
-    welcome = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)
+        welcome = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)
 
-    if welcome is None:
-        raise ConnectionError("server closed the connection during the handshake")
-    if welcome["type"] != WELCOME:
-        raise ProtocolError(f"expected '{WELCOME}', got '{welcome['type']}'")
+        if welcome is None:
+            raise ConnectionError("server closed the connection during the handshake")
+        if welcome["type"] == DENIED:
+            raise AccessDenied(str(welcome.get("reason") or "no reason given"))
+        if welcome["type"] != WELCOME:
+            raise ProtocolError(f"expected '{WELCOME}', got '{welcome['type']}'")
+    except BaseException:
+        # nothing is attached yet, so nobody else would ever close this socket
+        writer.close()
+        raise
 
     connection.attach(reader, writer, welcome)
     print_message(f"Connected to {GREEN}{connection.label}{RESET}")
