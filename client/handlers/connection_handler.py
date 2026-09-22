@@ -109,7 +109,11 @@ async def handshake():
 
     # the server keeps the last known state, give it one to start from
     if get_device() is not None:
-        await send_message(writer, STATE, state=await run_action(GET_STATE, {}))
+        try:
+            # optional: a failure here must not drop the connection we just attached
+            await send_message(writer, STATE, state=await run_action(GET_STATE, {}))
+        except Exception as e:
+            print_message(f"{RED}Could not send the device state{RESET}: {e}")
 
 
 async def send_to_server(message_type, /, **payload):
