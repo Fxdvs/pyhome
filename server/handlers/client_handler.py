@@ -74,26 +74,38 @@ def clean_device(value):
     return None
 
 
+def token_required():
+    """True when the server has a TOKEN, so clients and the dashboard must send it."""
+    return bool(get_config("TOKEN"))
+
+
+def token_matches(given):
+    """True when given is the server's TOKEN. Always False when the server has none."""
+    expected = get_config("TOKEN")
+    if not expected or not isinstance(given, str) or not given:
+        return False
+    # compare_digest takes as long for a near miss as for a wild guess
+    return hmac.compare_digest(given.encode("utf-8"), str(expected).encode("utf-8"))
+
+
 def check_token(hello):
     """None when the client may stay, otherwise the reason it is refused."""
-    expected = get_config("TOKEN")
     # no token on the server keeps every existing client working after an upgrade
-    if not expected:
+    if not token_required():
         return None
 
     given = hello.get("token")
     if not isinstance(given, str) or not given:
         return "this server needs a token, set TOKEN in the client's config"
 
-    # compare_digest takes as long for a near miss as for a wild guess
-    if not hmac.compare_digest(given.encode("utf-8"), str(expected).encode("utf-8")):
+    if not token_matches(given):
         return "wrong token"
     return None
 
 
 def token_warning():
     """The startup warning for a server that lets everyone in, or None."""
-    if get_config("TOKEN"):
+    if token_required():
         return None
     return "No TOKEN set, every client that can reach this server is accepted"
 
