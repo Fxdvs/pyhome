@@ -127,7 +127,7 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `VERSION` | version string, shown in the window title |
 | `HOST` | server: address to bind to. client: address to connect to |
 | `PORT` | TCP port, `50000` by default |
-| `TOKEN` | shared secret, the client sends it in `hello`. On the server, empty means every client is accepted, with a warning at startup |
+| `TOKEN` | shared secret, the client sends it in `hello` and the dashboard asks for it. On the server, empty means every client is accepted and the dashboard is open, with a warning at startup |
 | `WEB_HOST` | server only, address the dashboard binds to |
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 
@@ -215,7 +215,20 @@ The server runs FastAPI on port `50001`:
 | Route | Description |
 | --- | --- |
 | `GET /` | the dashboard page (`server/web/index.html`), one card per connected client with its device, capabilities and last state, refreshed every 2 s |
-| `GET /api/clients` | the connected clients as JSON, which the page reads |
+| `GET /api/status` | `{"token_required": true}` or `false`, no token needed, the page reads it first |
+| `GET /api/clients` | the connected clients as JSON, which the page reads. Needs the token when the server has one |
+
+When the server has a `TOKEN`, the page asks for it once and keeps it in the
+browser (`localStorage`), **Odhlásiť** forgets it. The API takes it in a header,
+never in the URL:
+
+```
+curl -H "Authorization: Bearer <token>" http://localhost:50001/api/clients
+```
+
+A missing or wrong token gets `401 {"error": "token required"}`. Without a
+`TOKEN` the dashboard is open to everyone who can reach its port, as in 1.0,
+and the server says so at startup.
 
 ## Protocol
 
@@ -267,10 +280,11 @@ py tests/run_all.py
 ## Known limitations
 
 - **The token is not encryption.** It travels in plain text over a plain TCP
-  socket. It keeps a neighbour or a stray device on the same network out, it
-  does not stop anyone who can watch the traffic.
-- **The dashboard needs no token.** It is read only, but anyone who can reach
-  its port sees every connected device and its state.
+  socket and over plain HTTP from the browser. It keeps a neighbour or a stray
+  device on the same network out, it does not stop anyone who can watch the
+  traffic.
+- **The browser keeps the token.** Anyone with the unlocked phone or computer
+  has the dashboard until **Odhlásiť** is pressed.
 - **Clients are not addressable by name.** `send` takes an id or `all`.
 
 ## Roadmap
