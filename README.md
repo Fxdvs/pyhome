@@ -275,11 +275,39 @@ py tests/run_all.py
 
 ## Roadmap
 
-1. ~~A typed, newline framed message protocol shared by both sides~~
-2. ~~Server to client messaging, addressed by client id~~
-3. ~~Per instance configuration so one checkout can run several clients~~
-4. ~~Device modules, so a client can declare what it is and what it can do~~
-5. ~~Authentication during the handshake~~
+Done:
 
-Items 3 to 5 are v1.0 and are specified in
-[docs/v1.0-spec.md](docs/v1.0-spec.md).
+1. ~~A typed, newline framed message protocol shared by both sides~~ (0.9)
+2. ~~Server to client messaging, addressed by client id~~ (0.9)
+3. ~~Per instance configuration so one checkout can run several clients~~ (1.0)
+4. ~~Device modules, so a client can declare what it is and what it can do~~ (1.0)
+5. ~~Authentication during the handshake~~ (1.0)
+
+What each version delivered is in [docs/versions/](docs/versions/README.md).
+
+Next, one theme per version. Each gets its own spec in `docs/` before any
+code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md) did.
+
+| Version | Theme | Contents |
+| --- | --- | --- |
+| 1.1 | Control from the browser, safely | Dashboard behind the token, device controls on the dashboard, clients addressable by name |
+| 1.2 | Encrypted transport | TLS on the client connection, HTTPS for the dashboard, a guide to making certificates |
+| 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
+| 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+
+Everything that is possible but not planned yet:
+
+| Idea | Why it is not done yet | Version |
+| --- | --- | --- |
+| Device controls on the dashboard | The web handler needs to reach the client registry | 1.1 |
+| Token on the dashboard | It is read only for now | 1.1 |
+| Clients addressable by name | `send` and `do` take an id or `all` | 1.1 |
+| TLS | Needs certificates, a separate piece of work | 1.2 |
+| Persisting device state | Losing it on restart is acceptable for now, the client can be asked again | 1.3 |
+| `clients.json` as a dict keyed by id | Changing it means migrating existing files | 1.3 |
+| Devices from several folders | Nothing needs it yet | 1.3 |
+| Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
+| Choosing between several servers | One server is enough so far | 1.4 |
+| Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
+| Automations, rules and schedules | Not specified yet | later |
+| More device types (sensor, switch, blinds) | Light and thermostat cover the contract for now | later |
