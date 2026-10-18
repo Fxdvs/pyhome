@@ -56,6 +56,8 @@ class System:
         self.processes = []
         self.logs = {}
         self.server = None
+        # the server's TOKEN, sent to the dashboard API once the server has one
+        self.token = None
 
     def start(self, name, app_dir, config, stdin=subprocess.DEVNULL):
         config_path = os.path.join(self.tmp, f"{name}.json")
@@ -74,6 +76,7 @@ class System:
         return process
 
     def start_server(self, **extra):
+        self.token = extra.get("TOKEN") or None
         self.server = self.start("server", SERVER_DIR, {
             "ID": "e2e-server", "NAME": "E2E server", "TYPE": "server", "VERSION": "test",
             "HOST": "127.0.0.1", "PORT": self.port,
@@ -89,12 +92,24 @@ class System:
             **extra,
         })
 
+    def http(self, path, token=None):
+        """(status, parsed JSON body) of a GET to the dashboard. Raises when it does not answer."""
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        request = urllib.request.Request(f"http://127.0.0.1:{self.web_port}{path}", headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=2) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            # an error status still carries a body, read it like a success
+            with e:
+                return e.code, json.load(e)
+
     def api(self):
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{self.web_port}/api/clients", timeout=2) as r:
-                return json.load(r)["clients"]
+            status, body = self.http("/api/clients", self.token)
         except (urllib.error.URLError, OSError, ValueError):
             return None
+        return body["clients"] if status == 200 else None
 
     def client(self, client_id):
         for client in self.api() or []:
