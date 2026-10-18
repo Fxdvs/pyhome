@@ -110,6 +110,15 @@
   .duo .v { margin-top: 4px; font-size: 20px; font-weight: 620; font-variant-numeric: tabular-nums; }
   .ok { font-size: 15px; font-weight: 560; color: #1d7a3a; }
   .warn { font-size: 15px; font-weight: 560; color: #b35c00; }
+
+  /* prihlásenie tokenom */
+  button.pill { font-family: inherit; color: inherit; cursor: pointer; }
+  .login { display: flex; flex-direction: column; gap: 14px; }
+  .login-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .login-row input { flex: 1 1 200px; min-width: 0; padding: 12px 16px; border-radius: 14px;
+    border: 1px solid rgba(28,28,30,.14); background: rgba(255,255,255,.8); font: inherit; }
+  .btn { padding: 12px 20px; border: 0; border-radius: 14px; background: var(--grad); color: #fff;
+    font: inherit; font-weight: 600; cursor: pointer; }
   .spacer { flex: 1; }
 
   .empty { grid-column: 1 / -1; padding: 64px 28px; text-align: center; border-radius: 30px;
@@ -134,6 +143,7 @@
       <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">Načítavam…</span></div>
       <div class="pill" id="updated">—</div>
       <div class="badge-demo" id="demoBadge" style="display:none;">DEMO DÁTA</div>
+      <button class="pill" id="logout" type="button" style="display:none;">Odhlásiť</button>
     </div>
   </div>
 
@@ -178,6 +188,18 @@ const DEMO = [
   { id: "c18ba402", name: "hall", host: "192.168.1.9", port: 51544, device: "sensor",
     capabilities: ["get_state"], last_state: { aqi: 38, humidity: "44 %", co2: "612 ppm" } }
 ];
+
+// token na /api, nikdy nie v URL; localStorage, aby sa mobil nepýtal pri každej návšteve
+const TOKEN_KEY = "pyhome.token";
+let token = loadToken();
+let tokenRequired = false;
+let loginShown = false;
+
+// localStorage môže byť zakázané (súkromné okno), token potom žije len v tejto karte
+function loadToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+function saveToken(value) { token = value; try { localStorage.setItem(TOKEN_KEY, value); } catch (e) {} }
+function forgetToken() { token = ""; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+function authHeaders() { return token ? { Authorization: "Bearer " + token } : {}; }
 
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -301,11 +323,57 @@ function showOffline() {
   document.getElementById("updated").textContent = "Naposledy skúšané " + new Date().toLocaleTimeString("sk-SK");
 }
 
+function showLogin(message) {
+  loginShown = true;
+  document.getElementById("logout").style.display = "none";
+  document.getElementById("statusDot").className = "dot off";
+  document.getElementById("statusText").textContent = "Prihlásenie";
+  // bez tokenu nič z posledných dát, ani v prehľade
+  document.getElementById("updated").textContent = "—";
+  document.getElementById("countMetric").innerHTML = "—";
+  document.getElementById("devicesSummary").textContent = "Po prihlásení";
+  document.getElementById("typeChips").innerHTML = '<span class="chip">—</span>';
+  document.getElementById("serverRows").innerHTML = "";
+  document.getElementById("clients").innerHTML = `<div class="card span2 login">
+    <div class="name">Dashboard je chránený tokenom</div>
+    <div class="sub">Zadaj TOKEN z konfigurácie servera.</div>
+    <form class="login-row" id="loginForm">
+      <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Token" required>
+      <button class="btn" type="submit">Prihlásiť</button>
+    </form>
+    ${message ? `<div class="warn">${esc(message)}</div>` : ""}
+  </div>`;
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = document.getElementById("tokenInput").value.trim();
+    if (!value) return;
+    saveToken(value);
+    loginShown = false;
+    poll();
+  });
+  document.getElementById("tokenInput").focus();
+}
+
+document.getElementById("logout").addEventListener("click", () => {
+  forgetToken();
+  showLogin("");
+});
+
 async function poll() {
+  // kým je zobrazené prihlásenie, nie je čo pýtať
+  if (loginShown) return;
   try {
-    const r = await fetch("/api/clients", { cache: "no-store" });
+    const r = await fetch("/api/clients", { cache: "no-store", headers: authHeaders() });
+    if (r.status === 401) {
+      // zlý token, alebo ho medzitým zmenili na serveri
+      tokenRequired = true;
+      forgetToken();
+      showLogin("Nesprávny alebo zmenený token");
+      return;
+    }
     if (!r.ok) throw new Error(r.status);
     const data = await r.json();
+    document.getElementById("logout").style.display = tokenRequired ? "" : "none";
     render(data.clients || [], false);
   } catch (e) {
     // demo data is for previewing the file from disk, from the server a failed
@@ -317,8 +385,24 @@ async function poll() {
     }
   }
 }
-poll();
-setInterval(poll, 2000);
+async function start() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    tokenRequired = !!(await r.json()).token_required;
+  } catch (e) {
+    // server je dole alebo stránka je otvorená zo súboru, poll ukáže ktoré z toho
+    tokenRequired = false;
+  }
+  document.getElementById("serverHint").textContent = tokenRequired
+    ? "Chránený tokenom"
+    : "Ovládanie je vypnuté, server nemá nastavený TOKEN";
+
+  if (tokenRequired && !token) showLogin("");
+  else poll();
+  setInterval(poll, 2000);
+}
+start();
 </script>
 </body>
 </html>

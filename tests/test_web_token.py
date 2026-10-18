@@ -126,5 +126,23 @@ def test_handshake_still_refuses_what_it_refused(tmp):
     assert "needs a token" in client_handler.check_token({})
 
 
+def test_page_sends_the_token_in_a_header(tmp):
+    page = read_index()
+    assert '"/api/status"' in page
+    assert 'Authorization: "Bearer " + token' in page
+    assert 'headers: authHeaders()' in page
+    # never in the URL, it would end up in the browser history
+    assert "?token=" not in page and "&token=" not in page
+
+
+def test_page_remembers_and_forgets_the_token(tmp):
+    page = read_index()
+    assert '"pyhome.token"' in page and "localStorage" in page
+    assert "r.status === 401" in page and "forgetToken()" in page
+    assert "Odhlásiť" in page and "Prihlásiť" in page
+    assert "Nesprávny alebo zmenený token" in page
+    assert "server nemá nastavený TOKEN" in page
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
