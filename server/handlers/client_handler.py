@@ -23,6 +23,8 @@ from shared.protocol import (
 HANDSHAKE_TIMEOUT = 10
 # how long do waits for a client to answer a cmd
 COMMAND_TIMEOUT = 5
+# every device answers this one, it is not in capabilities
+GET_STATE = "get_state"
 
 
 def get_clients_file():
@@ -268,8 +270,9 @@ async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
     """Send cmd to the online client with this id and wait for its result.
 
     Returns the result message. Raises LookupError when no such client is
-    online, asyncio.TimeoutError when it does not answer in time and
-    ConnectionError when it disconnects first.
+    online, ValueError when its device has no such action,
+    asyncio.TimeoutError when it does not answer in time and ConnectionError
+    when it disconnects first.
     """
     async with clients_lock:
         found = next(
@@ -280,6 +283,12 @@ async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
         raise LookupError(f"no online client with id '{client_id}'")
 
     addr, info = found
+    # refuse here rather than after a round trip, the client would only say the same
+    capabilities = info.get("capabilities", [])
+    if action not in capabilities and action != GET_STATE:
+        has = ", ".join(capabilities) or "no actions"
+        raise ValueError(f"unknown action '{action}', this device has: {has}")
+
     request_id = uuid4().hex[:8]
     future = asyncio.get_running_loop().create_future()
     pending_requests[request_id] = (addr, future)

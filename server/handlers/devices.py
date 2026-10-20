@@ -41,7 +41,7 @@ def parse_params(tokens):
 async def run_and_print(client_id, action, params):
     try:
         result = await send_command(client_id, action, params)
-    except LookupError as e:
+    except (LookupError, ValueError) as e:
         print(f"{ERROR} {e}")
         return
     except asyncio.TimeoutError:
