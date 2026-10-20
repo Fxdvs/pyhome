@@ -104,6 +104,20 @@ class System:
             with e:
                 return e.code, json.load(e)
 
+    def post(self, path, body, token=None):
+        """(status, parsed JSON body) of a POST with a JSON body to the dashboard."""
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        data = json.dumps(body).encode("utf-8")
+        request = urllib.request.Request(f"http://127.0.0.1:{self.web_port}{path}", data=data, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=10) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            with e:
+                return e.code, json.load(e)
+
     def api(self):
         try:
             status, body = self.http("/api/clients", self.token)
