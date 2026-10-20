@@ -97,9 +97,9 @@ def test_error_body_shape(tmp):
 
 def test_status_says_whether_a_token_is_needed(tmp):
     use_server_config(tmp, TOKEN="s3cret")
-    assert asyncio.run(web_handler.api_status()) == {"token_required": True}
+    assert asyncio.run(web_handler.api_status()) == {"token_required": True, "controls": True}
     use_server_config(tmp, TOKEN="")
-    assert asyncio.run(web_handler.api_status()) == {"token_required": False}
+    assert asyncio.run(web_handler.api_status()) == {"token_required": False, "controls": False}
 
 
 def test_only_the_data_is_protected(tmp):

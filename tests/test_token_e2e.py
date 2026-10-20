@@ -49,7 +49,7 @@ def test_token_protects_the_dashboard(tmp):
         wait_for(lambda: system.client("e2e-lamp"), "the client to show on the dashboard")
 
         # the page and the status are public, the page needs them to ask for the token
-        assert system.http("/api/status") == (200, {"token_required": True})
+        assert system.http("/api/status") == (200, {"token_required": True, "controls": True})
         with urllib.request.urlopen(f"http://127.0.0.1:{system.web_port}/", timeout=5) as r:
             assert r.status == 200
 
@@ -75,7 +75,7 @@ def test_no_token_accepts_everyone_with_a_warning(tmp):
         wait_for(lambda: system.client("e2e-open") and system.client("e2e-plain"), "both clients")
 
         # the dashboard stays open as in 1.0, and says so at startup
-        assert system.http("/api/status") == (200, {"token_required": False})
+        assert system.http("/api/status") == (200, {"token_required": False, "controls": False})
         assert system.http("/api/clients")[0] == 200
         assert "anyone who can reach the dashboard" in system.log("server"), system.log("server")
 
