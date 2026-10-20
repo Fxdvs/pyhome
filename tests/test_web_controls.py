@@ -180,5 +180,48 @@ def test_the_do_route_checks_token_then_controls(tmp):
     assert [d.dependency for d in route.dependencies] == [web_handler.require_token, web_handler.require_controls]
 
 
+def read_index():
+    with open(INDEX, encoding="utf-8") as f:
+        return f.read()
+
+
+def test_page_posts_actions_with_the_token(tmp):
+    page = read_index()
+    assert '"/api/clients/" + encodeURIComponent(id) + "/do"' in page
+    assert 'method: "POST"' in page
+    assert 'headers: { ...authHeaders(), "Content-Type": "application/json" }' in page
+
+
+def test_page_controls_only_when_the_server_allows(tmp):
+    page = read_index()
+    assert "controls = !!status.controls;" in page
+    # demo data and a failed status read never get controls
+    assert page.count("controls = false;") >= 1
+    assert "return controls && (c.capabilities || []).includes(action);" in page
+
+
+def test_page_sends_the_slider_once_on_release(tmp):
+    page = read_index()
+    assert 'clientsGrid.addEventListener("change"' in page
+    # input only moves the fill, it never sends anything
+    start = page.index('clientsGrid.addEventListener("input"')
+    end = page.index("});", start)
+    assert "runAction" not in page[start:end], page[start:end]
+
+
+def test_page_does_not_redraw_a_busy_card(tmp):
+    page = read_index()
+    assert "fresh.dataset.id = id;" in page
+    assert "const busy = pending.has(id) || dragging.has(id);" in page
+    # the old way replaced the whole grid on every poll
+    assert "clients.map(clientCard).join" not in page
+
+
+def test_page_shows_errors_for_a_while(tmp):
+    page = read_index()
+    assert "until: Date.now() + 4000" in page
+    assert 'class="err"' in page
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
