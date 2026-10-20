@@ -38,15 +38,16 @@ A client can use another config file, which is how one checkout runs several
 clients:
 
 ```
-py app.py --config data/kitchen.json
+py app.py --config data/kuchyna-svetlo.json
 ```
 
 A new config file only needs `NAME`, the network settings and, for a device, `DEVICE`, and
-`TOKEN` when the server has one. If `ID` is
-missing or empty, the first run generates one (8 hex characters) and writes it
-back into the file. When making a new config by copying an existing one,
-delete its `ID` line (or leave it empty) so the first run gives it a fresh
-one; the launcher refuses configs that share an ID.
+`TOKEN` when the server has one. If `ID` is missing or empty, the first run
+takes it from the file name (`kuchyna-svetlo.json` becomes `kuchyna-svetlo`)
+and writes it back into the file. A file name that is not a usable id, and
+`config.json`, get 8 random hex characters instead. So the quickest new device
+is: copy a config to `<room>-<device>.json` and empty its `ID`. The launcher
+refuses configs that share an ID.
 
 To keep strangers out, put the same `TOKEN` in the server's config and in every
 client's config. A client with a missing or different token is refused with the
@@ -133,6 +134,32 @@ Both sides read `data/config.json`, or the file given with `--config`:
 
 The server can rename itself at runtime with `data config edit name`.
 
+### Ids
+
+The id is what you type in `do`, `state` and `send`, the name is what you read:
+
+| Field | Used for | Rule | Example |
+| --- | --- | --- | --- |
+| `ID` | typing in commands | `room-device`: lowercase `a-z`, `0-9` and `-`, no spaces or diacritics | `kuchyna-svetlo`, `obyvacka-termostat` |
+| `NAME` | display, dashboard and console | anything, diacritics welcome | `Kuchyňa svetlo` |
+| server `ID` | the window title and `about` | one word | `dom` |
+| config file | the launcher list | same as the id | `client/data/kuchyna-svetlo.json` |
+
+An id that breaks the rule still works, the client and the launcher only warn.
+`all` is reserved for `send all`.
+
+The start of an id is enough, as long as only one online client starts that
+way, in any case:
+
+```
+do kuch turn_on          → kuchyna-svetlo
+state obyv               → obyvacka-termostat
+do kuch turn_on          ✘ 'kuch' matches 2 online clients: kuchyna-svetlo, kuchyna-termostat
+```
+
+An exact id always wins: with `kuchyna` and `kuchyna-svetlo` online, `kuchyna`
+means the first one. The dashboard API takes full ids only.
+
 ## Commands
 
 Type commands at the `>` prompt. Every command has aliases.
@@ -146,12 +173,14 @@ Type commands at the `>` prompt. Every command has aliases.
 | `data clients clear` | `data clients cls` | Clears the client list |
 | `data config edit name` | `data conf edit name` | Edits the server name |
 | `data config show` | `data conf show` | Shows formatted config.json |
-| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result. An action the device does not list is refused before anything is sent |
+| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result with the full id. An action the device does not list is refused before anything is sent |
 | `help` | `commands`, `?` | Lists all available commands |
 | `list` | `ls` | Lists all clients, online ones in green |
 | `send <id\|all> <message>` | `msg` | Sends a message to one client or to all |
 | `shutdown` | `exit`, `quit` | Shuts down the server |
 | `state <id>` | | Asks a client for its device state |
+
+`<id>` in `do`, `state` and `send` may be the start of an id, see [Ids](#ids).
 
 **Client**
 
@@ -315,7 +344,6 @@ py tests/run_all.py
 - **One secret for everything.** Anyone with a client config has the token and
   so can control every device from the browser. Fine for one household, not
   for guests.
-- **Clients are not addressable by name.** `send` takes an id or `all`.
 
 ## Roadmap
 
