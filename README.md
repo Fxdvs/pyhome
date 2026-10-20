@@ -146,7 +146,7 @@ Type commands at the `>` prompt. Every command has aliases.
 | `data clients clear` | `data clients cls` | Clears the client list |
 | `data config edit name` | `data conf edit name` | Edits the server name |
 | `data config show` | `data conf show` | Shows formatted config.json |
-| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result |
+| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result. An action the device does not list is refused before anything is sent |
 | `help` | `commands`, `?` | Lists all available commands |
 | `list` | `ls` | Lists all clients, online ones in green |
 | `send <id\|all> <message>` | `msg` | Sends a message to one client or to all |
@@ -215,8 +215,9 @@ The server runs FastAPI on port `50001`:
 | Route | Description |
 | --- | --- |
 | `GET /` | the dashboard page (`server/web/index.html`), one card per connected client with its device, capabilities and last state, refreshed every 2 s |
-| `GET /api/status` | `{"token_required": true}` or `false`, no token needed, the page reads it first |
+| `GET /api/status` | `{"token_required": true, "controls": true}`, both `false` without a `TOKEN`. No token needed, the page reads it first |
 | `GET /api/clients` | the connected clients as JSON, which the page reads. Needs the token when the server has one |
+| `POST /api/clients/<id>/do` | runs a device action, body `{"action": "set_brightness", "params": {"level": 40}}`. Needs the token, and a server without one refuses it with 403 |
 
 When the server has a `TOKEN`, the page asks for it once and keeps it in the
 browser (`localStorage`), **Odhlásiť** forgets it. The API takes it in a header,
@@ -229,6 +230,32 @@ curl -H "Authorization: Bearer <token>" http://localhost:50001/api/clients
 A missing or wrong token gets `401 {"error": "token required"}`. Without a
 `TOKEN` the dashboard is open to everyone who can reach its port, as in 1.0,
 and the server says so at startup.
+
+With a `TOKEN` the cards become controls: the light's switch and brightness
+slider, the thermostat's switch and **−** / **+** (0.5 °C), and for any other
+device each action as a button. The same from a script:
+
+```
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+     -d '{"action": "turn_on"}' http://localhost:50001/api/clients/kuchyna-svetlo/do
+```
+
+| Answer | When |
+| --- | --- |
+| `200 {"ok": true, "state": {...}}` | the device ran it |
+| `200 {"ok": false, "error": "..."}` | the device refused the value |
+| `400` | a bad body, or an action the device does not have |
+| `403` | the server has no `TOKEN`, browser controls are off |
+| `404` | no online client with that id |
+| `502` | the client disconnected while the server waited |
+| `504` | no answer within 5 s |
+
+Every action from the browser prints a line on the server console, with the
+address it came from:
+
+```
+Dashboard 192.168.1.30 → Kuchyňa svetlo#kuchyna-svetlo set_brightness {"level": 40}
+```
 
 ## Protocol
 
@@ -284,7 +311,10 @@ py tests/run_all.py
   device on the same network out, it does not stop anyone who can watch the
   traffic.
 - **The browser keeps the token.** Anyone with the unlocked phone or computer
-  has the dashboard until **Odhlásiť** is pressed.
+  has the dashboard, controls included, until **Odhlásiť** is pressed.
+- **One secret for everything.** Anyone with a client config has the token and
+  so can control every device from the browser. Fine for one household, not
+  for guests.
 - **Clients are not addressable by name.** `send` takes an id or `all`.
 
 ## Roadmap
