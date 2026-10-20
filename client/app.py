@@ -12,8 +12,9 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
-from shared.config import get_config  # noqa: E402
-from shared.colors import GREEN, RESET  # noqa: E402
+from shared.config import get_config, id_warning  # noqa: E402
+from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
+from shared.symbols import WARNING  # noqa: E402
 from handlers.device_handler import get_capabilities, load_device  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
@@ -40,6 +41,11 @@ if os.name == "nt":
 
 # run handlers in parallel
 async def main():
+    # a warning, not a refusal: the id is also the key in the server's clients.json
+    warning = id_warning(ID)
+    if warning:
+        print(f"{WARNING} {YELLOW}{warning}{RESET}")
+
     # a missing device raises here and ends up in "Fatal error", on purpose
     if load_device(DEVICES_DIR, "devices", get_config("DEVICE")) is not None:
         print(f"Device {GREEN}{get_config('DEVICE')}{RESET}: {', '.join(get_capabilities())}")

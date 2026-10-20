@@ -5,7 +5,7 @@ import math
 
 from shared.colors import GREEN, RESET
 from shared.symbols import ERROR, SUCCESS
-from handlers.client_handler import COMMAND_TIMEOUT, send_command
+from handlers.client_handler import COMMAND_TIMEOUT, find_online_client, send_command
 
 
 def parse_value(text):
@@ -38,10 +38,13 @@ def parse_params(tokens):
     return params
 
 
-async def run_and_print(client_id, action, params):
+async def run_and_print(target, action, params):
+    client_id = target
     try:
+        # the full id from here on, so a prefix still prints which device answered
+        client_id = str(find_online_client(target)[1]["id"])
         result = await send_command(client_id, action, params)
-    except LookupError as e:
+    except (LookupError, ValueError) as e:
         print(f"{ERROR} {e}")
         return
     except asyncio.TimeoutError:

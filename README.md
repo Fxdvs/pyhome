@@ -7,7 +7,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `1.0`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.1`, see [Known limitations](#known-limitations).
 
 ## Requirements
 
@@ -38,15 +38,16 @@ A client can use another config file, which is how one checkout runs several
 clients:
 
 ```
-py app.py --config data/kitchen.json
+py app.py --config data/kuchyna-svetlo.json
 ```
 
 A new config file only needs `NAME`, the network settings and, for a device, `DEVICE`, and
-`TOKEN` when the server has one. If `ID` is
-missing or empty, the first run generates one (8 hex characters) and writes it
-back into the file. When making a new config by copying an existing one,
-delete its `ID` line (or leave it empty) so the first run gives it a fresh
-one; the launcher refuses configs that share an ID.
+`TOKEN` when the server has one. If `ID` is missing or empty, the first run
+takes it from the file name (`kuchyna-svetlo.json` becomes `kuchyna-svetlo`)
+and writes it back into the file. A file name that is not a usable id, and
+`config.json`, get 8 random hex characters instead. So the quickest new device
+is: copy a config to `<room>-<device>.json` and empty its `ID`. The launcher
+refuses configs that share an ID.
 
 To keep strangers out, put the same `TOKEN` in the server's config and in every
 client's config. A client with a missing or different token is refused with the
@@ -127,11 +128,37 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `VERSION` | version string, shown in the window title |
 | `HOST` | server: address to bind to. client: address to connect to |
 | `PORT` | TCP port, `50000` by default |
-| `TOKEN` | shared secret, the client sends it in `hello`. On the server, empty means every client is accepted, with a warning at startup |
+| `TOKEN` | shared secret, the client sends it in `hello` and the dashboard asks for it. On the server, empty means every client is accepted and the dashboard is open, with a warning at startup |
 | `WEB_HOST` | server only, address the dashboard binds to |
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 
 The server can rename itself at runtime with `data config edit name`.
+
+### Ids
+
+The id is what you type in `do`, `state` and `send`, the name is what you read:
+
+| Field | Used for | Rule | Example |
+| --- | --- | --- | --- |
+| `ID` | typing in commands | `room-device`: lowercase `a-z`, `0-9` and `-`, no spaces or diacritics | `kuchyna-svetlo`, `obyvacka-termostat` |
+| `NAME` | display, dashboard and console | anything, diacritics welcome | `Kuchyňa svetlo` |
+| server `ID` | the window title and `about` | one word | `dom` |
+| config file | the launcher list | same as the id | `client/data/kuchyna-svetlo.json` |
+
+An id that breaks the rule still works, the client and the launcher only warn.
+`all` is reserved for `send all`.
+
+The start of an id is enough, as long as only one online client starts that
+way, in any case:
+
+```
+do kuch turn_on          → kuchyna-svetlo
+state obyv               → obyvacka-termostat
+do kuch turn_on          ✘ 'kuch' matches 2 online clients: kuchyna-svetlo, kuchyna-termostat
+```
+
+An exact id always wins: with `kuchyna` and `kuchyna-svetlo` online, `kuchyna`
+means the first one. The dashboard API takes full ids only.
 
 ## Commands
 
@@ -146,12 +173,14 @@ Type commands at the `>` prompt. Every command has aliases.
 | `data clients clear` | `data clients cls` | Clears the client list |
 | `data config edit name` | `data conf edit name` | Edits the server name |
 | `data config show` | `data conf show` | Shows formatted config.json |
-| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result |
+| `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result with the full id. An action the device does not list is refused before anything is sent |
 | `help` | `commands`, `?` | Lists all available commands |
 | `list` | `ls` | Lists all clients, online ones in green |
 | `send <id\|all> <message>` | `msg` | Sends a message to one client or to all |
 | `shutdown` | `exit`, `quit` | Shuts down the server |
 | `state <id>` | | Asks a client for its device state |
+
+`<id>` in `do`, `state` and `send` may be the start of an id, see [Ids](#ids).
 
 **Client**
 
@@ -215,7 +244,47 @@ The server runs FastAPI on port `50001`:
 | Route | Description |
 | --- | --- |
 | `GET /` | the dashboard page (`server/web/index.html`), one card per connected client with its device, capabilities and last state, refreshed every 2 s |
-| `GET /api/clients` | the connected clients as JSON, which the page reads |
+| `GET /api/status` | `{"token_required": true, "controls": true}`, both `false` without a `TOKEN`. No token needed, the page reads it first |
+| `GET /api/clients` | the connected clients as JSON, which the page reads. Needs the token when the server has one |
+| `POST /api/clients/<id>/do` | runs a device action, body `{"action": "set_brightness", "params": {"level": 40}}`. Needs the token, and a server without one refuses it with 403 |
+
+When the server has a `TOKEN`, the page asks for it once and keeps it in the
+browser (`localStorage`), **Odhlásiť** forgets it. The API takes it in a header,
+never in the URL:
+
+```
+curl -H "Authorization: Bearer <token>" http://localhost:50001/api/clients
+```
+
+A missing or wrong token gets `401 {"error": "token required"}`. Without a
+`TOKEN` the dashboard is open to everyone who can reach its port, as in 1.0,
+and the server says so at startup.
+
+With a `TOKEN` the cards become controls: the light's switch and brightness
+slider, the thermostat's switch and **−** / **+** (0.5 °C), and for any other
+device each action as a button. The same from a script:
+
+```
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+     -d '{"action": "turn_on"}' http://localhost:50001/api/clients/kuchyna-svetlo/do
+```
+
+| Answer | When |
+| --- | --- |
+| `200 {"ok": true, "state": {...}}` | the device ran it |
+| `200 {"ok": false, "error": "..."}` | the device refused the value |
+| `400` | a bad body, or an action the device does not have |
+| `403` | the server has no `TOKEN`, browser controls are off |
+| `404` | no online client with that id |
+| `502` | the client disconnected while the server waited |
+| `504` | no answer within 5 s |
+
+Every action from the browser prints a line on the server console, with the
+address it came from:
+
+```
+Dashboard 192.168.1.30 → Kuchyňa svetlo#kuchyna-svetlo set_brightness {"level": 40}
+```
 
 ## Protocol
 
@@ -267,19 +336,50 @@ py tests/run_all.py
 ## Known limitations
 
 - **The token is not encryption.** It travels in plain text over a plain TCP
-  socket. It keeps a neighbour or a stray device on the same network out, it
-  does not stop anyone who can watch the traffic.
-- **The dashboard needs no token.** It is read only, but anyone who can reach
-  its port sees every connected device and its state.
-- **Clients are not addressable by name.** `send` takes an id or `all`.
+  socket and over plain HTTP from the browser. It keeps a neighbour or a stray
+  device on the same network out, it does not stop anyone who can watch the
+  traffic.
+- **The browser keeps the token.** Anyone with the unlocked phone or computer
+  has the dashboard, controls included, until **Odhlásiť** is pressed.
+- **One secret for everything.** Anyone with a client config has the token and
+  so can control every device from the browser. Fine for one household, not
+  for guests.
 
 ## Roadmap
 
-1. ~~A typed, newline framed message protocol shared by both sides~~
-2. ~~Server to client messaging, addressed by client id~~
-3. ~~Per instance configuration so one checkout can run several clients~~
-4. ~~Device modules, so a client can declare what it is and what it can do~~
-5. ~~Authentication during the handshake~~
+Done:
 
-Items 3 to 5 are v1.0 and are specified in
-[docs/v1.0-spec.md](docs/v1.0-spec.md).
+1. ~~A typed, newline framed message protocol shared by both sides~~ (0.9)
+2. ~~Server to client messaging, addressed by client id~~ (0.9)
+3. ~~Per instance configuration so one checkout can run several clients~~ (1.0)
+4. ~~Device modules, so a client can declare what it is and what it can do~~ (1.0)
+5. ~~Authentication during the handshake~~ (1.0)
+6. ~~Dashboard behind the token~~ (1.1)
+7. ~~Device controls on the dashboard~~ (1.1)
+8. ~~Readable ids and id prefixes in commands~~ (1.1)
+
+What each version delivered is in [docs/versions/](docs/versions/README.md).
+
+Next, one theme per version. Each gets its own spec in `docs/` before any
+code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md) and
+[docs/v1.1-spec.md](docs/v1.1-spec.md) did.
+
+| Version | Theme | Contents |
+| --- | --- | --- |
+| 1.2 | Encrypted transport | TLS on the client connection, HTTPS for the dashboard, a guide to making certificates |
+| 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
+| 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+
+Everything that is possible but not planned yet:
+
+| Idea | Why it is not done yet | Version |
+| --- | --- | --- |
+| TLS | Needs certificates, a separate piece of work | 1.2 |
+| Persisting device state | Losing it on restart is acceptable for now, the client can be asked again | 1.3 |
+| `clients.json` as a dict keyed by id | Changing it means migrating existing files | 1.3 |
+| Devices from several folders | Nothing needs it yet | 1.3 |
+| Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
+| Choosing between several servers | One server is enough so far | 1.4 |
+| Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
+| Automations, rules and schedules | Not specified yet | later |
+| More device types (sensor, switch, blinds) | Light and thermostat cover the contract for now | later |

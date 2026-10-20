@@ -4,12 +4,12 @@ from handlers.client_handler import get_connected_clients
 from handlers.devices import parse_params, run_and_print
 
 command = ["do"]
-description = "Runs a device action on a client: do <id> <action> [key=value ...]"
+description = "Runs a device action on a client: do <id or start of id> <action> [key=value ...]"
 
 
 async def function(*params):
     if len(params) < 2:
-        print(f"{ERROR} Usage: do <client id> <action> [key=value ...]")
+        print(f"{ERROR} Usage: do <id or start of id> <action> [key=value ...]")
         online = [f"{info['id']} ({info.get('device') or 'no device'})"
                   for info in get_connected_clients().values()]
         if online:

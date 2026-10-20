@@ -23,6 +23,8 @@ from shared.protocol import (
 HANDSHAKE_TIMEOUT = 10
 # how long do waits for a client to answer a cmd
 COMMAND_TIMEOUT = 5
+# every device answers this one, it is not in capabilities
+GET_STATE = "get_state"
 
 
 def get_clients_file():
@@ -74,26 +76,68 @@ def clean_device(value):
     return None
 
 
+def token_required():
+    """True when the server has a TOKEN, so clients and the dashboard must send it."""
+    return bool(get_config("TOKEN"))
+
+
+def token_matches(given):
+    """True when given is the server's TOKEN. Always False when the server has none."""
+    expected = get_config("TOKEN")
+    if not expected or not isinstance(given, str) or not given:
+        return False
+    # compare_digest takes as long for a near miss as for a wild guess
+    return hmac.compare_digest(given.encode("utf-8"), str(expected).encode("utf-8"))
+
+
+def find_online_client(target):
+    """(addr, info) of the online client target names.
+
+    An exact id wins, then an id that differs only in case. Otherwise target
+    is a prefix, compared case insensitively, that must match exactly one
+    online client. Raises LookupError with a readable message when nothing
+    or more than one matches.
+    """
+    target = str(target)
+    online = list(connected_clients.items())
+
+    for addr, info in online:
+        if str(info["id"]) == target:
+            return addr, info
+
+    lowered = target.lower()
+    same = [(addr, info) for addr, info in online if str(info["id"]).lower() == lowered]
+    if len(same) == 1:
+        return same[0]
+
+    matches = same or [(addr, info) for addr, info in online if str(info["id"]).lower().startswith(lowered)]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise LookupError(f"no online client with id '{target}'")
+    # switching the wrong device is worse than asking
+    ids = ", ".join(sorted(str(info["id"]) for _, info in matches))
+    raise LookupError(f"'{target}' matches {len(matches)} online clients: {ids}")
+
+
 def check_token(hello):
     """None when the client may stay, otherwise the reason it is refused."""
-    expected = get_config("TOKEN")
     # no token on the server keeps every existing client working after an upgrade
-    if not expected:
+    if not token_required():
         return None
 
     given = hello.get("token")
     if not isinstance(given, str) or not given:
         return "this server needs a token, set TOKEN in the client's config"
 
-    # compare_digest takes as long for a near miss as for a wild guess
-    if not hmac.compare_digest(given.encode("utf-8"), str(expected).encode("utf-8")):
+    if not token_matches(given):
         return "wrong token"
     return None
 
 
 def token_warning():
     """The startup warning for a server that lets everyone in, or None."""
-    if get_config("TOKEN"):
+    if token_required():
         return None
     return "No TOKEN set, every client that can reach this server is accepted"
 
@@ -253,21 +297,23 @@ def fail_pending_requests(addr):
 
 
 async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
-    """Send cmd to the online client with this id and wait for its result.
+    """Send cmd to the online client client_id names and wait for its result.
 
-    Returns the result message. Raises LookupError when no such client is
-    online, asyncio.TimeoutError when it does not answer in time and
-    ConnectionError when it disconnects first.
+    client_id is an id or the start of one, see find_online_client. Returns
+    the result message. Raises LookupError when it names no online client or
+    more than one, ValueError when its device has no such action,
+    asyncio.TimeoutError when it does not answer in time and ConnectionError
+    when it disconnects first.
     """
     async with clients_lock:
-        found = next(
-            ((addr, info) for addr, info in connected_clients.items() if info["id"] == client_id),
-            None,
-        )
-    if found is None:
-        raise LookupError(f"no online client with id '{client_id}'")
+        addr, info = find_online_client(client_id)
 
-    addr, info = found
+    # refuse here rather than after a round trip, the client would only say the same
+    capabilities = info.get("capabilities", [])
+    if action not in capabilities and action != GET_STATE:
+        has = ", ".join(capabilities) or "no actions"
+        raise ValueError(f"unknown action '{action}', this device has: {has}")
+
     request_id = uuid4().hex[:8]
     future = asyncio.get_running_loop().create_future()
     pending_requests[request_id] = (addr, future)
@@ -279,16 +325,17 @@ async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
 
 
 async def send_to_clients(target, text):
-    """Send a message to one client id, or to every client when target is 'all'.
+    """Send a message to the client target names, or to every client when it is 'all'.
 
-    Returns (delivered, failed) as lists of "name#id" labels.
+    Returns (delivered, failed) as lists of "name#id" labels. Raises
+    LookupError like find_online_client when target names no single client.
     """
     async with clients_lock:
         # copy the matches out, so the lock is not held while writing
-        recipients = [
-            (addr, info) for addr, info in connected_clients.items()
-            if target == "all" or info["id"] == target
-        ]
+        if target == "all":
+            recipients = list(connected_clients.items())
+        else:
+            recipients = [find_online_client(target)]
 
     delivered = []
     failed = []

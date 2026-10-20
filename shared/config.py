@@ -7,6 +7,7 @@ several clients.
 """
 import json
 import os
+import re
 import sys
 from uuid import uuid4
 
@@ -14,6 +15,11 @@ from shared.symbols import ERROR
 
 _config_path = None
 _config_cache = None
+
+# room-device, what a person types in do and send: kuchyna-svetlo
+ID_PATTERN = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+# send all means every client, a client called all could never be picked alone
+RESERVED_IDS = {"all"}
 
 
 def init(app_dir, config_file=None):
@@ -45,6 +51,31 @@ def config_file_from_argv(argv):
     return path
 
 
+def id_from_file_name(path):
+    """The id a config file's name gives, or None. kuchyna-svetlo.json -> kuchyna-svetlo.
+
+    config.json gives None, the name says nothing about the device.
+    """
+    stem = os.path.splitext(os.path.basename(path))[0].lower()
+    if stem == "config" or stem in RESERVED_IDS or not ID_PATTERN.fullmatch(stem):
+        return None
+    return stem
+
+
+def id_warning(value):
+    """Why value makes a poor id, or None when it follows the rule. Never a refusal."""
+    text = str(value)
+    if text in RESERVED_IDS:
+        return f"ID '{text}' is reserved for send all, choose another"
+    if not ID_PATTERN.fullmatch(text):
+        warning = f"ID '{text}' does not follow the id rule (a-z, 0-9 and -)"
+        # the console splits arguments on whitespace, such an id can never be one
+        if any(ch.isspace() for ch in text):
+            warning += ", it cannot be typed in commands"
+        return warning
+    return None
+
+
 def get_config_path():
     if _config_path is None:
         raise RuntimeError("config.init() was never called")
@@ -65,10 +96,11 @@ def load_config(reload=False):
     with open(path, "r", encoding="utf-8") as f:
         _config_cache = json.load(f)
 
-    # a new config only needs NAME, the first run stamps its own identity
+    # a new config only needs NAME, the first run stamps its own identity,
+    # taken from the file name when that is a usable id
     if not _config_cache.get("ID"):
         rest = {k: v for k, v in _config_cache.items() if k != "ID"}
-        save_config({"ID": uuid4().hex[:8], **rest})
+        save_config({"ID": id_from_file_name(path) or uuid4().hex[:8], **rest})
     return _config_cache
 
 

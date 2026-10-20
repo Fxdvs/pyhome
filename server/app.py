@@ -13,13 +13,14 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
-from shared.colors import GREEN, RESET  # noqa: E402
+from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
 from shared.config import get_config  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
 from shared.network import get_local_ip  # noqa: E402
+from shared.symbols import WARNING  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
-from handlers.web_handler import app  # noqa: E402
+from handlers.web_handler import app, dashboard_warning  # noqa: E402
 
 NAME = get_config("NAME")
 ID = get_config("ID")
@@ -62,6 +63,10 @@ def print_web_url():
     # 0.0.0.0 means every interface, so show the address other devices can use
     if host == "0.0.0.0":
         print(f"{' ' * len(label)}{GREEN}http://{get_local_ip()}:{port}{RESET}")
+
+    warning = dashboard_warning()
+    if warning:
+        print(f"{WARNING} {YELLOW}{warning}{RESET}")
 
 # run handlers in parallel
 async def main():

@@ -36,7 +36,7 @@ def add_client(addr, client_id):
     writer = FakeWriter()
     client_handler.connected_clients[addr] = {
         "name": client_id.title(), "id": client_id, "writer": writer,
-        "device": "light", "capabilities": ["turn_on"], "last_state": None,
+        "device": "light", "capabilities": ["turn_on", "turn_off", "set_brightness"], "last_state": None,
     }
     return writer
 
@@ -124,14 +124,14 @@ def test_failed_result_keeps_last_state(tmp):
     client_handler.connected_clients[LAMP]["last_state"] = {"on": True}
 
     async def scenario():
-        task = asyncio.create_task(client_handler.send_command("lamp", "fly", {}, timeout=2))
+        task = asyncio.create_task(client_handler.send_command("lamp", "set_brightness", {"level": 900}, timeout=2))
         await until(lambda: writer.sent)
         client_handler.handle_message(LAMP, "lamp", {
-            "type": "result", "request_id": writer.sent[-1]["request_id"], "ok": False, "error": "unknown action 'fly'"})
+            "type": "result", "request_id": writer.sent[-1]["request_id"], "ok": False, "error": "level must be 0-100"})
         return await task
 
     result = quietly(scenario())
-    assert result == {"type": "result", "request_id": result["request_id"], "ok": False, "error": "unknown action 'fly'"}
+    assert result == {"type": "result", "request_id": result["request_id"], "ok": False, "error": "level must be 0-100"}
     assert client_handler.connected_clients[LAMP]["last_state"] == {"on": True}
 
 
@@ -168,6 +168,41 @@ def test_command_reaches_only_its_client(tmp):
 
     quietly(scenario())
     assert len(lamp.sent) == 1 and heater.sent == []
+
+
+def test_unknown_action_is_refused_before_sending(tmp):
+    reset()
+    writer = add_client(LAMP, "lamp")
+    try:
+        quietly(client_handler.send_command("lamp", "fly", {}, timeout=0.1))
+    except ValueError as e:
+        assert str(e) == "unknown action 'fly', this device has: turn_on, turn_off, set_brightness", e
+    else:
+        raise AssertionError("expected ValueError")
+    assert writer.sent == [] and client_handler.pending_requests == {}
+
+
+def test_get_state_is_always_allowed(tmp):
+    reset()
+    writer = add_client(LAMP, "lamp")
+    client_handler.connected_clients[LAMP]["capabilities"] = []
+    try:
+        quietly(client_handler.send_command("lamp", "get_state", {}, timeout=0.05))
+    except asyncio.TimeoutError:
+        pass
+    assert [m["action"] for m in writer.sent] == ["get_state"], writer.sent
+
+
+def test_a_client_without_actions_says_so(tmp):
+    reset()
+    add_client(LAMP, "lamp")
+    client_handler.connected_clients[LAMP]["capabilities"] = []
+    try:
+        quietly(client_handler.send_command("lamp", "turn_on", {}, timeout=0.1))
+    except ValueError as e:
+        assert str(e).endswith("this device has: no actions"), e
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_unknown_client_raises_lookup_error(tmp):

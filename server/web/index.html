@@ -110,6 +110,31 @@
   .duo .v { margin-top: 4px; font-size: 20px; font-weight: 620; font-variant-numeric: tabular-nums; }
   .ok { font-size: 15px; font-weight: 560; color: #1d7a3a; }
   .warn { font-size: 15px; font-weight: 560; color: #b35c00; }
+
+  /* ovládanie */
+  button.switch { border: 0; cursor: pointer; }
+  button.switch:disabled, .step:disabled, .chip.act:disabled { cursor: default; opacity: .55; }
+  .track.slide { position: relative; }
+  .track.slide input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .track.slide input:disabled { cursor: default; }
+  .step { width: 44px; height: 44px; border-radius: 14px; border: 0; background: rgba(120,90,160,.14);
+          font: inherit; font-size: 22px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .chip.act { cursor: pointer; color: inherit; }
+  .chip.act:hover:not(:disabled) { border-color: var(--c2); }
+  .err { font-size: 14px; font-weight: 560; color: #c4291c; }
+  .card.busy { position: relative; }
+  .card.busy::after { content: ""; position: absolute; top: 18px; right: 18px; width: 14px; height: 14px;
+    border-radius: 50%; border: 2px solid rgba(10,132,255,.25); border-top-color: var(--c2); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* prihlásenie tokenom */
+  button.pill { font-family: inherit; color: inherit; cursor: pointer; }
+  .login { display: flex; flex-direction: column; gap: 14px; }
+  .login-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .login-row input { flex: 1 1 200px; min-width: 0; padding: 12px 16px; border-radius: 14px;
+    border: 1px solid rgba(28,28,30,.14); background: rgba(255,255,255,.8); font: inherit; }
+  .btn { padding: 12px 20px; border: 0; border-radius: 14px; background: var(--grad); color: #fff;
+    font: inherit; font-weight: 600; cursor: pointer; }
   .spacer { flex: 1; }
 
   .empty { grid-column: 1 / -1; padding: 64px 28px; text-align: center; border-radius: 30px;
@@ -134,6 +159,7 @@
       <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">Načítavam…</span></div>
       <div class="pill" id="updated">—</div>
       <div class="badge-demo" id="demoBadge" style="display:none;">DEMO DÁTA</div>
+      <button class="pill" id="logout" type="button" style="display:none;">Odhlásiť</button>
     </div>
   </div>
 
@@ -179,6 +205,25 @@ const DEMO = [
     capabilities: ["get_state"], last_state: { aqi: 38, humidity: "44 %", co2: "612 ppm" } }
 ];
 
+// token na /api, nikdy nie v URL; localStorage, aby sa mobil nepýtal pri každej návšteve
+const TOKEN_KEY = "pyhome.token";
+let token = loadToken();
+let tokenRequired = false;
+let loginShown = false;
+
+// ovládanie: len so serverom, ktorý má TOKEN; demo dáta sa nikdy neovládajú
+let controls = false;
+let lastClients = [];
+const pending = new Set();   // id kariet, ktorým beží požiadavka
+const dragging = new Set();  // id kariet, kde práve ťaháš posuvník
+const errors = {};           // id -> { text, until }
+
+// localStorage môže byť zakázané (súkromné okno), token potom žije len v tejto karte
+function loadToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+function saveToken(value) { token = value; try { localStorage.setItem(TOKEN_KEY, value); } catch (e) {} }
+function forgetToken() { token = ""; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+function authHeaders() { return token ? { Authorization: "Bearer " + token } : {}; }
+
 const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function head(c, right) {
@@ -200,15 +245,24 @@ function lightCard(c) {
   const on = s.on === undefined ? null : !!s.on;
   const b = num(s.brightness ?? s.level);
   const shown = on === false ? 0 : (b === null ? 0 : b);
+  const width = Math.max(0, Math.min(100, shown));
+  const sw = can(c, on ? "turn_off" : "turn_on")
+    ? `<button class="switch${on ? " on" : ""}" type="button" data-act="${on ? "turn_off" : "turn_on"}" aria-label="${on ? "Vypnúť" : "Zapnúť"}"><div class="knob"></div></button>`
+    : `<div class="switch${on ? " on" : ""}"><div class="knob"></div></div>`;
+  const track = can(c, "set_brightness")
+    ? `<div class="track slide"><div class="fill" style="width:${width}%"></div>
+        <input type="range" min="0" max="100" step="1" value="${b === null ? 100 : b}" data-act="set_brightness" data-param="level" aria-label="Jas"></div>`
+    : `<div class="track"><div class="fill" style="width:${width}%"></div></div>`;
   return `<div class="card span2" style="min-height:236px;">
-    ${head(c, `<div class="switch${on ? " on" : ""}"><div class="knob"></div></div>`)}
+    ${head(c, sw)}
     <div class="spacer"></div>
     <div>
       <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:12px;">
         <span class="big">${b === null && on === null ? "—" : shown}</span><span class="unit">%</span>
       </div>
-      <div class="track"><div class="fill" style="width:${Math.max(0, Math.min(100, shown))}%"></div></div>
+      ${track}
     </div>
+    ${errLine(c)}
     ${capChips(c)}
   </div>`;
 }
@@ -218,10 +272,23 @@ function thermostatCard(c) {
   const s = c.last_state || {};
   const target = num(s.target ?? s.temperature ?? s.temp);
   const current = num(s.current ?? s.reading);
+  const on = s.on === undefined ? null : !!s.on;
+  const right = can(c, on ? "turn_off" : "turn_on")
+    ? `<button class="switch${on ? " on" : ""}" type="button" data-act="${on ? "turn_off" : "turn_on"}" aria-label="${on ? "Vypnúť" : "Zapnúť"}"><div class="knob"></div></button>`
+    : `<div class="icon">${ICONS.thermostat}</div>`;
+  // krok 0,5 °C, zaokrúhlené na polovice, aby sa nekopili desatinné chyby
+  const step = (d) => Math.round(((target === null ? 21 : target) + d) * 2) / 2;
+  const stepper = (d, label) => can(c, "set_target")
+    ? `<button class="step" type="button" data-act="set_target" data-param="temperature" data-value="${step(d)}" aria-label="${d < 0 ? "Znížiť" : "Zvýšiť"}">${label}</button>`
+    : "";
   return `<div class="card span2" style="min-height:236px;">
-    ${head(c, `<div class="icon">${ICONS.thermostat}</div>`)}
-    <div style="display:flex; align-items:baseline; gap:2px;">
-      <span class="big" style="font-size:60px;">${target === null ? "—" : target}</span><span class="unit" style="font-size:24px;">°</span>
+    ${head(c, right)}
+    <div style="display:flex; align-items:center; gap:14px;">
+      ${stepper(-0.5, "−")}
+      <div style="display:flex; align-items:baseline; gap:2px;">
+        <span class="big" style="font-size:60px;">${target === null ? "—" : target}</span><span class="unit" style="font-size:24px;">°</span>
+      </div>
+      ${stepper(0.5, "+")}
     </div>
     <div class="spacer"></div>
     <div class="duo">
@@ -229,6 +296,7 @@ function thermostatCard(c) {
       <div><div class="k">Aktuálne</div><div class="v">${current === null ? "—" : current + "°"}</div></div>
     </div>
     <div class="${s.heating ? "warn" : "ok"}">${s.on === false ? "Vypnutý" : s.heating === undefined ? "Stav vykurovania neznámy" : (s.heating ? "Vykuruje" : "Nastavená teplota dosiahnutá")}</div>
+    ${errLine(c)}
     ${capChips(c)}
   </div>`;
 }
@@ -247,13 +315,28 @@ function statCard(c) {
     <div class="spacer"></div>
     ${rest.length ? `<div class="rows">${rest.map(([k, v]) =>
       `<div class="row"><span>${esc(k)}</span><span>${typeof v === "boolean" ? (v ? "áno" : "nie") : esc(v)}</span></div>`).join("")}</div>` : ""}
-    ${capChips(c)}
+    ${errLine(c)}
+    ${capChips(c, true)}
   </div>`;
 }
 
-function capChips(c) {
+// pri neznámom zariadení sa z čipov stanú tlačidlá, akcia ide bez parametrov
+function capChips(c, buttons) {
   const caps = c.capabilities || [];
-  return caps.length ? `<div class="chips">${caps.map((a) => `<span class="chip">${esc(a)}</span>`).join("")}</div>` : "";
+  return caps.length ? `<div class="chips">${caps.map((a) => buttons && can(c, a)
+    ? `<button class="chip act" type="button" data-act="${esc(a)}">${esc(a)}</button>`
+    : `<span class="chip">${esc(a)}</span>`).join("")}</div>` : "";
+}
+
+function can(c, action) {
+  return controls && (c.capabilities || []).includes(action);
+}
+
+function errLine(c) {
+  const e = errors[c.id];
+  if (!e) return "";
+  if (Date.now() > e.until) { delete errors[c.id]; return ""; }
+  return `<div class="err">${esc(e.text)}</div>`;
 }
 
 function clientCard(c) {
@@ -288,11 +371,115 @@ function render(clients, demo) {
     <div class="row"><span>So zariadením</span><span>${withDev}</span></div>
     <div class="row"><span>Akcie celkom</span><span>${caps}</span></div>`;
 
-  document.getElementById("clients").innerHTML = clients.length
-    ? clients.map(clientCard).join("")
-    : `<div class="empty"><div class="name">Žiadny pripojený klient</div>
-       <div class="sub">Spusti klienta cez launcher alebo <code>py app.py --config data/kitchen.json</code></div></div>`;
+  lastClients = clients;
+  renderClients(clients);
 }
+
+// karta po karte: prekreslenie celej mriežky by zahodilo ťahaný posuvník aj klik
+function renderClients(clients) {
+  const grid = document.getElementById("clients");
+  if (!clients.length) {
+    grid.innerHTML = `<div class="empty"><div class="name">Žiadny pripojený klient</div>
+       <div class="sub">Spusti klienta cez launcher alebo <code>py app.py --config data/kitchen.json</code></div></div>`;
+    return;
+  }
+  // prázdna karta alebo prihlásenie nemajú data-id, preč s nimi
+  [...grid.children].forEach((n) => { if (!n.dataset.id) n.remove(); });
+
+  const seen = new Set();
+  clients.forEach((c, i) => {
+    const id = String(c.id);
+    seen.add(id);
+    let node = [...grid.children].find((n) => n.dataset.id === id);
+    const busy = pending.has(id) || dragging.has(id);
+    if (!node || (!busy && node._html !== clientCard(c))) {
+      const html = clientCard(c);
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      const fresh = tmp.firstElementChild;
+      fresh.dataset.id = id;
+      fresh._html = html;
+      if (node) node.replaceWith(fresh); else grid.appendChild(fresh);
+      node = fresh;
+    }
+    if (grid.children[i] !== node) grid.insertBefore(node, grid.children[i] || null);
+  });
+  [...grid.children].forEach((n) => { if (!seen.has(n.dataset.id)) n.remove(); });
+}
+
+function setBusy(id, busy) {
+  const node = [...document.getElementById("clients").children].find((n) => n.dataset.id === id);
+  if (!node) return;
+  node.classList.toggle("busy", busy);
+  node.querySelectorAll("[data-act]").forEach((el) => { el.disabled = busy; });
+}
+
+async function runAction(id, action, params) {
+  if (pending.has(id)) return;
+  pending.add(id);
+  setBusy(id, true);
+  let error = null;
+  try {
+    const r = await fetch("/api/clients/" + encodeURIComponent(id) + "/do", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ action, params }),
+    });
+    if (r.status === 401) {
+      pending.delete(id);
+      forgetToken();
+      showLogin("Nesprávny alebo zmenený token");
+      return;
+    }
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.ok) {
+      // odpoveď nesie nový stav, karta sa zmení hneď a nečaká na ďalší poll
+      const c = lastClients.find((x) => String(x.id) === id);
+      if (c && data.state && typeof data.state === "object") c.last_state = data.state;
+    } else {
+      error = data.error || "Chyba " + r.status;
+    }
+  } catch (e) {
+    error = "Server nedostupný";
+  }
+  pending.delete(id);
+  if (error) errors[id] = { text: error, until: Date.now() + 4000 };
+  // prekresliť vždy: aj keď sa stav nezmenil, tlačidlá sú vypnuté a posuvník je tam, kam ho pustili
+  const node = [...document.getElementById("clients").children].find((n) => n.dataset.id === id);
+  if (node) node._html = null;
+  renderClients(lastClients);
+}
+
+const clientsGrid = document.getElementById("clients");
+clientsGrid.addEventListener("click", (e) => {
+  const el = e.target.closest("button[data-act]");
+  if (!el || el.disabled) return;
+  const card = el.closest("[data-id]");
+  if (!card) return;
+  const params = {};
+  if (el.dataset.param) params[el.dataset.param] = Number(el.dataset.value);
+  runAction(card.dataset.id, el.dataset.act, params);
+});
+// počas ťahania sa hýbe len výplň, požiadavka ide až po pustení
+clientsGrid.addEventListener("pointerdown", (e) => {
+  const card = e.target.matches("input[type=range]") && e.target.closest("[data-id]");
+  if (card) dragging.add(card.dataset.id);
+});
+clientsGrid.addEventListener("input", (e) => {
+  if (!e.target.matches("input[type=range]")) return;
+  const fill = e.target.parentElement.querySelector(".fill");
+  if (fill) fill.style.width = e.target.value + "%";
+});
+clientsGrid.addEventListener("change", (e) => {
+  const el = e.target;
+  if (!el.matches("input[data-act]")) return;
+  const card = el.closest("[data-id]");
+  if (!card) return;
+  dragging.delete(card.dataset.id);
+  runAction(card.dataset.id, el.dataset.act, { [el.dataset.param]: Number(el.value) });
+});
+// pustenie mimo posuvníka nevyvolá change, karta sa nesmie zaseknúť
+window.addEventListener("pointerup", () => setTimeout(() => dragging.clear(), 0));
 
 function showOffline() {
   document.getElementById("demoBadge").style.display = "none";
@@ -301,11 +488,57 @@ function showOffline() {
   document.getElementById("updated").textContent = "Naposledy skúšané " + new Date().toLocaleTimeString("sk-SK");
 }
 
+function showLogin(message) {
+  loginShown = true;
+  document.getElementById("logout").style.display = "none";
+  document.getElementById("statusDot").className = "dot off";
+  document.getElementById("statusText").textContent = "Prihlásenie";
+  // bez tokenu nič z posledných dát, ani v prehľade
+  document.getElementById("updated").textContent = "—";
+  document.getElementById("countMetric").innerHTML = "—";
+  document.getElementById("devicesSummary").textContent = "Po prihlásení";
+  document.getElementById("typeChips").innerHTML = '<span class="chip">—</span>';
+  document.getElementById("serverRows").innerHTML = "";
+  document.getElementById("clients").innerHTML = `<div class="card span2 login">
+    <div class="name">Dashboard je chránený tokenom</div>
+    <div class="sub">Zadaj TOKEN z konfigurácie servera.</div>
+    <form class="login-row" id="loginForm">
+      <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Token" required>
+      <button class="btn" type="submit">Prihlásiť</button>
+    </form>
+    ${message ? `<div class="warn">${esc(message)}</div>` : ""}
+  </div>`;
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = document.getElementById("tokenInput").value.trim();
+    if (!value) return;
+    saveToken(value);
+    loginShown = false;
+    poll();
+  });
+  document.getElementById("tokenInput").focus();
+}
+
+document.getElementById("logout").addEventListener("click", () => {
+  forgetToken();
+  showLogin("");
+});
+
 async function poll() {
+  // kým je zobrazené prihlásenie, nie je čo pýtať
+  if (loginShown) return;
   try {
-    const r = await fetch("/api/clients", { cache: "no-store" });
+    const r = await fetch("/api/clients", { cache: "no-store", headers: authHeaders() });
+    if (r.status === 401) {
+      // zlý token, alebo ho medzitým zmenili na serveri
+      tokenRequired = true;
+      forgetToken();
+      showLogin("Nesprávny alebo zmenený token");
+      return;
+    }
     if (!r.ok) throw new Error(r.status);
     const data = await r.json();
+    document.getElementById("logout").style.display = tokenRequired ? "" : "none";
     render(data.clients || [], false);
   } catch (e) {
     // demo data is for previewing the file from disk, from the server a failed
@@ -317,8 +550,27 @@ async function poll() {
     }
   }
 }
-poll();
-setInterval(poll, 2000);
+async function start() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const status = await r.json();
+    tokenRequired = !!status.token_required;
+    controls = !!status.controls;
+  } catch (e) {
+    // server je dole alebo stránka je otvorená zo súboru, poll ukáže ktoré z toho
+    tokenRequired = false;
+    controls = false;
+  }
+  document.getElementById("serverHint").textContent = controls
+    ? "Chránený tokenom, ovládanie zapnuté"
+    : tokenRequired ? "Chránený tokenom" : "Ovládanie je vypnuté, server nemá nastavený TOKEN";
+
+  if (tokenRequired && !token) showLogin("");
+  else poll();
+  setInterval(poll, 2000);
+}
+start();
 </script>
 </body>
 </html>
