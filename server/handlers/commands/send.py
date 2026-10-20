@@ -3,12 +3,12 @@ from shared.symbols import SUCCESS, ERROR
 from handlers.client_handler import get_connected_clients, send_to_clients
 
 command = ["send", "msg"]
-description = "Send a message to a client: send <id|all> <message>"
+description = "Send a message to a client: send <id, start of id or all> <message>"
 
 
 async def function(*params):
     if len(params) < 2:
-        print(f"{ERROR} Usage: send <client id|all> <message>")
+        print(f"{ERROR} Usage: send <id, start of id or all> <message>")
 
         online = get_connected_clients()
         if online:
@@ -21,10 +21,14 @@ async def function(*params):
     target = params[0]
     text = " ".join(params[1:])
 
-    delivered, failed = await send_to_clients(target, text)
+    try:
+        delivered, failed = await send_to_clients(target, text)
+    except LookupError as e:
+        print(f"{ERROR} {e}")
+        return
 
     if not delivered and not failed:
-        print(f"{ERROR} No client matched '{target}'.")
+        print(f"{ERROR} No client is connected.")
         return
 
     for label in delivered:
