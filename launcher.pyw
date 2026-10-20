@@ -12,6 +12,11 @@ import tkinter as tk
 from tkinter import messagebox
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# the shared package sits next to this file, like for the apps
+sys.path.insert(0, ROOT_DIR)
+
+from shared.config import id_warning  # noqa: E402
+
 SERVER_DIR = os.path.join(ROOT_DIR, "server")
 CLIENT_DIR = os.path.join(ROOT_DIR, "client")
 SERVER_CONFIG = os.path.join(SERVER_DIR, "data", "config.json")
@@ -51,7 +56,8 @@ def list_client_configs(data_dir):
 
     Two configs sharing a non-empty id would collapse into one row wherever
     the id is the key (the dashboard, clients.json, `send <id>`), so both are
-    flagged with an error instead of silently letting that happen.
+    flagged with an error instead of silently letting that happen. An id
+    that breaks the id rule only gets a note, the config still runs.
     """
     if not os.path.isdir(data_dir):
         return []
@@ -62,13 +68,15 @@ def list_client_configs(data_dir):
             continue
 
         path = os.path.join(data_dir, file)
-        entry = {"file": file, "path": path, "name": None, "device": None, "id": None, "error": None}
+        entry = {"file": file, "path": path, "name": None, "device": None, "id": None, "error": None, "note": None}
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             entry["name"] = data.get("NAME")
             entry["device"] = data.get("DEVICE") or None
             entry["id"] = data.get("ID") or None
+            if entry["id"]:
+                entry["note"] = id_warning(entry["id"])
         except (OSError, ValueError, AttributeError):
             # AttributeError: valid JSON that is not an object has no .get
             entry["error"] = "invalid JSON"
@@ -191,6 +199,8 @@ class LauncherWindow:
                 detail = entry["error"]
             else:
                 detail = f"{entry['name'] or ''}  {entry['device'] or '(no device)'}"
+                if entry["note"]:
+                    detail += f"  ! {entry['note']}"
             self.add_row(row, app, entry["file"], detail, entry["error"] is None)
             row += 1
 

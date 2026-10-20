@@ -37,7 +37,7 @@ def test_lists_client_configs(tmp):
     assert [e["file"] for e in entries] == ["a.json", "b.json", "c.json"], entries
     a, b, c = entries
     assert a == {"file": "a.json", "path": os.path.join(tmp, "a.json"), "id": "a1",
-                 "name": "Kitchen", "device": "light", "error": None}, a
+                 "name": "Kitchen", "device": "light", "error": None, "note": None}, a
     assert b["name"] == "Plain" and b["device"] is None and b["error"] is None and b["id"] is None, b
     assert c["error"] == "invalid JSON" and c["name"] is None and c["id"] is None, c
 
@@ -53,6 +53,17 @@ def test_duplicate_ids_are_flagged(tmp):
     assert a["error"] == "duplicate ID 1", a
     assert b["error"] == "duplicate ID 1", b
     assert c["error"] is None, c
+
+
+def test_an_id_off_the_rule_is_a_note_not_an_error(tmp):
+    write(os.path.join(tmp, "a.json"), json.dumps({"NAME": "A", "ID": "Kuchyňa 1"}))
+    write(os.path.join(tmp, "b.json"), json.dumps({"NAME": "B", "ID": "kuchyna-svetlo"}))
+    write(os.path.join(tmp, "c.json"), json.dumps({"NAME": "C"}))
+
+    a, b, c = launcher.list_client_configs(tmp)
+
+    assert a["error"] is None and "cannot be typed" in a["note"], a
+    assert b["note"] is None and c["note"] is None, (b, c)
 
 
 def test_missing_or_empty_ids_are_not_duplicates(tmp):
