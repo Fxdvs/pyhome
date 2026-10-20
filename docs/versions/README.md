@@ -5,6 +5,7 @@ deliberately left for later. The newest version is at the top.
 
 | Version | Date | Theme | Notes |
 | --- | --- | --- | --- |
+| [1.1](v1.1.md) | 2026-10-20 | Control from the browser, safely | [spec](../v1.1-spec.md) |
 | [1.0](v1.0.md) | 2026-09-22 | Several devices at once, safely | [spec](../v1.0-spec.md) |
 | [0.9](v0.9.md) | 2026-09-21 | One shared codebase and a real protocol | |
 | [0.7 / 0.8](v0.8.md) | 2025-10-22 | The working base | |
