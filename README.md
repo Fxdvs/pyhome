@@ -7,7 +7,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `1.1`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.2`, see [Known limitations](#known-limitations).
 
 ## Requirements
 
@@ -464,16 +464,18 @@ Done:
 6. ~~Dashboard behind the token~~ (1.1)
 7. ~~Device controls on the dashboard~~ (1.1)
 8. ~~Readable ids and id prefixes in commands~~ (1.1)
+9. ~~Certificates made by the project itself~~ (1.2)
+10. ~~TLS on the client connection~~ (1.2)
+11. ~~HTTPS for the dashboard~~ (1.2)
 
 What each version delivered is in [docs/versions/](docs/versions/README.md).
 
 Next, one theme per version. Each gets its own spec in `docs/` before any
-code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md) and
-[docs/v1.1-spec.md](docs/v1.1-spec.md) did.
+code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
+[docs/v1.1-spec.md](docs/v1.1-spec.md) and [docs/v1.2-spec.md](docs/v1.2-spec.md) did.
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.2 | Encrypted transport ([spec](docs/v1.2-spec.md)) | TLS on the client connection, HTTPS for the dashboard, a guide to making certificates |
 | 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
 | 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
 
@@ -481,7 +483,6 @@ Everything that is possible but not planned yet:
 
 | Idea | Why it is not done yet | Version |
 | --- | --- | --- |
-| TLS | Needs certificates, a separate piece of work | 1.2 |
 | Persisting device state | Losing it on restart is acceptable for now, the client can be asked again | 1.3 |
 | `clients.json` as a dict keyed by id | Changing it means migrating existing files | 1.3 |
 | Devices from several folders | Nothing needs it yet | 1.3 |

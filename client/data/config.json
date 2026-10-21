@@ -3,7 +3,7 @@
     "NAME": "Client",
     "TYPE": "client",
     "DEVICE": "light",
-    "VERSION": "1.1",
+    "VERSION": "1.2",
     "HOST": "127.0.0.1",
     "PORT": 50000,
     "TOKEN": "",
