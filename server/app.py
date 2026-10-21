@@ -21,6 +21,7 @@ from shared.network import get_local_ip  # noqa: E402
 from shared.symbols import WARNING  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
 from handlers.web_handler import app, dashboard_warning  # noqa: E402
+from handlers.tls import ca_file, fingerprint, uvicorn_options  # noqa: E402
 
 NAME = get_config("NAME")
 ID = get_config("ID")
@@ -49,6 +50,8 @@ async def start_web():
         port=get_config("WEB_PORT", 50001),
         # uvicorn logs every request, which would trample the command prompt
         log_level="warning",
+        # the same certificate as the client listener, HTTPS only on this port
+        **uvicorn_options(),
     )
     server = uvicorn.Server(uv_config)
     await server.serve()
@@ -57,12 +60,18 @@ def print_web_url():
     host = get_config("WEB_HOST", "0.0.0.0")
     port = get_config("WEB_PORT", 50001)
     label = "Dashboard running on "
+    scheme = "https" if uvicorn_options() else "http"
 
-    print(f"{label}{GREEN}http://localhost:{port}{RESET}")
+    print(f"{label}{GREEN}{scheme}://localhost:{port}{RESET}")
 
     # 0.0.0.0 means every interface, so show the address other devices can use
     if host == "0.0.0.0":
-        print(f"{' ' * len(label)}{GREEN}http://{get_local_ip()}:{port}{RESET}")
+        print(f"{' ' * len(label)}{GREEN}{scheme}://{get_local_ip()}:{port}{RESET}")
+
+    # what a phone shows when installing ca.crt, compare before trusting it
+    ca = ca_file()
+    if ca:
+        print(f"{' ' * len(label)}ca.crt at /ca.crt, SHA-256 {fingerprint(ca)}")
 
     warning = dashboard_warning()
     if warning:
