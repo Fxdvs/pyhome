@@ -3,6 +3,7 @@ import sys
 
 from shared.colors import GREEN, RESET, YELLOW
 from shared.config import get_config
+from shared.network import is_address_in_use, port_in_use_message
 from shared.symbols import ERROR, WARNING
 from handlers.client_handler import handle_client_async, token_warning
 from handlers.tls import TLSConfigError, server_context, startup_lines
@@ -14,12 +15,17 @@ async def start_server_async():
     except TLSConfigError as e:
         sys.exit(f"{ERROR} {e}")
 
-    server = await asyncio.start_server(
-        handle_client_async,
-        get_config("HOST"),
-        get_config("PORT"),
-        ssl=context,
-    )
+    try:
+        server = await asyncio.start_server(
+            handle_client_async,
+            get_config("HOST"),
+            get_config("PORT"),
+            ssl=context,
+        )
+    except OSError as e:
+        if is_address_in_use(e):
+            sys.exit(f"{ERROR} {port_in_use_message(get_config('PORT'), 'clients')}")
+        raise
 
     addr = server.sockets[0].getsockname()
     print(f"{GREEN}{get_config('NAME')}#{get_config('ID')}{RESET} running on {addr[0]}:{addr[1]}")

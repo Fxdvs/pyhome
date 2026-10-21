@@ -201,3 +201,34 @@ def test_reconnecting_client_starts_from_the_stored_state(tmp):
             server.close()
 
     assert quietly(scenario()) == [{"on": True, "brightness": 40}]
+
+
+# a port that is taken
+
+def test_address_in_use_is_recognised(tmp):
+    import errno
+    assert network.is_address_in_use(OSError(errno.EADDRINUSE, "in use"))
+    assert network.is_address_in_use(OSError(10048, "only one usage of each socket address"))
+    assert not network.is_address_in_use(OSError(errno.ECONNREFUSED, "refused"))
+    assert not network.is_address_in_use(ValueError("not an OSError"))
+
+
+def test_port_in_use_message(tmp, monkeypatch):
+    monkeypatch.setattr(network.os, "name", "nt")
+    assert network.port_in_use_message(50000, "clients") == (
+        "Port 50000 for the clients is already in use, probably by another pyhome server.\n"
+        "  Find it with: netstat -ano | findstr :50000")
+    monkeypatch.setattr(network.os, "name", "posix")
+    assert network.port_in_use_message(50001, "dashboard").endswith("Find it with: lsof -i :50001")
+
+
+def test_check_port_free(tmp):
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+        with pytest.raises(OSError) as error:
+            network.check_port_free("127.0.0.1", port)
+        assert network.is_address_in_use(error.value), error.value
+    # free again once the listener is gone
+    network.check_port_free("127.0.0.1", port)

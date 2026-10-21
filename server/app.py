@@ -17,10 +17,15 @@ from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
 from shared.config import get_config  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
-from shared.network import get_local_ip  # noqa: E402
+from shared.network import check_port_free, get_local_ip, is_address_in_use, port_in_use_message  # noqa: E402
 from shared.symbols import ERROR, WARNING  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
-from handlers.store import StoreError, count_clients, get_store_path, open_store  # noqa: E402
+from handlers.store import (  # noqa: E402
+    StoreError, count_clients, count_history, get_store_path, history_days, open_store, prune_history,
+)
+
+# how often old history is pruned while the server runs
+PRUNE_SECONDS = 24 * 60 * 60
 from handlers.web_handler import app, dashboard_warning  # noqa: E402
 from handlers.tls import ca_file, fingerprint, uvicorn_options  # noqa: E402
 
@@ -87,12 +92,37 @@ def open_database():
     except StoreError as e:
         sys.exit(f"{ERROR} {e}")
     shown = os.path.relpath(path, ROOT_DIR) if path.startswith(ROOT_DIR) else path
-    line = f"Database {shown}, {count_clients()} clients known"
+    removed = prune_history(history_days())
+    line = f"Database {shown}, {count_clients()} clients known, {count_history()} history entries"
     if imported:
         line += f", {imported} imported from clients.json"
+    if removed:
+        line += f", {removed} older than {history_days()} days removed"
     print(line)
 
+async def prune_daily():
+    """Keep the history to HISTORY_DAYS while the server runs for weeks."""
+    while True:
+        await asyncio.sleep(PRUNE_SECONDS)
+        prune_history(history_days())
+
+def check_ports():
+    """Fail with a readable line before anything starts.
+
+    Before the database too: a second server started by mistake must not
+    touch the first one's pyhome.db. uvicorn's own message would be a traceback.
+    """
+    for host, port, what in ((get_config("HOST"), get_config("PORT"), "clients"),
+                             (get_config("WEB_HOST", "0.0.0.0"), get_config("WEB_PORT", 50001), "dashboard")):
+        try:
+            check_port_free(host, port)
+        except OSError as e:
+            if is_address_in_use(e):
+                sys.exit(f"{ERROR} {port_in_use_message(port, what)}")
+            raise
+
 async def main():
+    check_ports()
     open_database()
     server = await start_server_async()
     print_web_url()
@@ -101,6 +131,7 @@ async def main():
     await asyncio.gather(
         accept_clients(server),
         start_web(),
+        prune_daily(),
         command_handler_async(COMMAND_SOURCES)
     )
 
