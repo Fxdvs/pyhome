@@ -4,6 +4,7 @@ Both sides read commands at a "> " prompt while messages arrive in the
 background. Printing straight to stdout would leave the half typed prompt
 in the middle of the output, so every message goes through here.
 """
+import asyncio
 import re
 import sys
 import threading
@@ -33,6 +34,15 @@ def print_message(message: str):
         # draw the prompt again
         sys.stdout.write(PROMPT)
         sys.stdout.flush()
+
+
+async def ask(prompt):
+    """input() for an async command, off the event loop.
+
+    input() blocks; called straight from a coroutine it would stop the whole
+    server, clients and dashboard included, until someone answers.
+    """
+    return await asyncio.get_running_loop().run_in_executor(None, input, prompt)
 
 
 def wait_for_enter():
