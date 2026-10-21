@@ -6,6 +6,8 @@
     "HOST": "0.0.0.0",
     "PORT": 50000,
     "TOKEN": "",
+    "TLS_CERT": "",
+    "TLS_KEY": "",
     "WEB_HOST": "0.0.0.0",
     "WEB_PORT": 50001
 }
