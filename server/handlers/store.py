@@ -80,6 +80,12 @@ def get_store_path():
     return os.path.join(os.path.dirname(get_config_path()), DB_NAME)
 
 
+def local_time(iso, fmt="%d.%m. %H:%M"):
+    """A stored UTC time as text in this computer's time zone, for people to read."""
+    moment = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return moment.astimezone().strftime(fmt)
+
+
 def now_iso():
     """The current time as ISO 8601 UTC text, which sorts correctly as text."""
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -354,3 +360,37 @@ def prune_history(days, now=None):
             # ISO 8601 text sorts like the time it names, so < compares times
             statement = statement.where(StateHistory.at < cutoff)
         return session.execute(statement).rowcount
+
+
+def list_states():
+    """{client id: last state} of every client that has one, in one query.
+
+    The dashboard draws every known client; asking for each state on its own
+    would be one query per client, the N+1 problem.
+    """
+    with _session() as session:
+        return {row.client_id: json.loads(row.state) for row in session.scalars(select(DeviceState))}
+
+
+def backup(folder=None):
+    """A consistent copy of the database as pyhome-backup-<date>-<time>.db, safe while the server runs.
+
+    Uses SQLite's own backup, which copies page by page under a read lock and
+    includes what still sits in the WAL file; a plain file copy would not.
+    Returns the path of the copy.
+    """
+    if _engine is None:
+        raise RuntimeError("store.open_store() was never called")
+    source_path = _engine.url.database
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    target_path = os.path.join(folder or os.path.dirname(source_path), f"pyhome-backup-{stamp}.db")
+    raw = _engine.raw_connection()
+    try:
+        target = sqlite3.connect(target_path)
+        try:
+            raw.driver_connection.backup(target)
+        finally:
+            target.close()
+    finally:
+        raw.close()
+    return target_path

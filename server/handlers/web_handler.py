@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from shared.colors import GRAY, RESET
 from shared.console import print_message
+from handlers import store
 from handlers.tls import ca_file
 from handlers.client_handler import (
     COMMAND_TIMEOUT,
@@ -62,19 +63,62 @@ async def error_body(request, exc):
 
 
 def serialize_clients():
-    """Client list without the writer objects, which cannot be turned into JSON."""
+    """Every known client as JSON: the online ones first, then the offline ones, the most recently seen first.
+
+    Online clients come from memory, without the writer objects; offline ones
+    from the store, with the last state the server remembers.
+    """
+    known = store.list_clients()
+    last_seen = {c["id"]: c["last_seen"] for c in known}
     clients = []
+    online_ids = set()
     for addr, info in get_connected_clients().items():
+        client_id = str(info.get("id"))
+        online_ids.add(client_id)
         clients.append({
             "id": info.get("id"),
             "name": info.get("name"),
+            "online": True,
             "host": addr[0],
             "port": addr[1],
             "device": info.get("device"),
             "capabilities": info.get("capabilities", []),
             "last_state": info.get("last_state"),
+            "last_seen": last_seen.get(client_id),
+        })
+
+    # one query for every state, not one per offline client
+    states = store.list_states()
+    for client in known:
+        if client["id"] in online_ids:
+            continue
+        clients.append({
+            "id": client["id"],
+            "name": client["name"],
+            "online": False,
+            "host": None,
+            "port": None,
+            "device": client["device"],
+            "capabilities": client["capabilities"],
+            "last_state": states.get(client["id"]),
+            "last_seen": client["last_seen"],
         })
     return clients
+
+
+# how many history entries one request may ask for
+HISTORY_LIMIT_MAX = 500
+
+
+def parse_limit(value):
+    """limit from the query string: a whole number from 1 to HISTORY_LIMIT_MAX. ValueError otherwise."""
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("limit must be a whole number") from None
+    if not 1 <= limit <= HISTORY_LIMIT_MAX:
+        raise ValueError(f"limit must be from 1 to {HISTORY_LIMIT_MAX}")
+    return limit
 
 
 # the page holds no data, it has to load without a token to be able to ask for one
@@ -164,6 +208,18 @@ async def api_status():
 @app.get("/api/clients", dependencies=[Depends(require_token)])
 async def api_clients():
     return {"clients": serialize_clients()}
+
+
+@app.get("/api/clients/{client_id}/history", dependencies=[Depends(require_token)])
+async def api_history(client_id, limit="50"):
+    """The newest entries of a client's history first, online or not."""
+    try:
+        count = parse_limit(limit)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    if store.get_client(client_id) is None:
+        return JSONResponse({"error": f"no known client with id '{client_id}'"}, status_code=404)
+    return {"history": store.get_history(client_id, count)}
 
 
 # the annotation is how FastAPI hands over the raw request, the body is checked by hand
