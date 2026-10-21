@@ -15,7 +15,6 @@ sys.path.insert(0, ROOT_DIR)
 
 from handlers import client_handler  # noqa: E402
 from handlers.devices import run_and_print  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -171,7 +170,3 @@ def test_do_prints_why_a_prefix_is_ambiguous(tmp):
     with contextlib.redirect_stdout(out):
         asyncio.run(run_and_print("kuch", "turn_on", {}))
     assert "'kuch' matches 2 online clients: kuchyna-svetlo, kuchyna-termostat" in out.getvalue(), out.getvalue()
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

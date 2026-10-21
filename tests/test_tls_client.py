@@ -15,9 +15,8 @@ sys.path.insert(0, ROOT_DIR)
 
 from shared import config  # noqa: E402
 from shared.protocol import read_message, send_message  # noqa: E402
-from handlers import connection_handler  # noqa: E402
-from handlers.commands import reconnect  # noqa: E402
-from helpers import run_tests  # noqa: E402
+from client_handlers import connection_handler  # noqa: E402
+from client_handlers.commands import reconnect  # noqa: E402
 
 # make_certs lives with the server, the client itself never imports it
 sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
@@ -316,7 +315,3 @@ def test_tls_warning(tmp):
         "No TLS_CA set, the token and every message cross the network in plain text"
     use_client_config(tmp, 1, TLS_CA="certs/ca.crt")
     assert connection_handler.tls_warning() is None
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

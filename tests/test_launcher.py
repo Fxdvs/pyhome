@@ -6,11 +6,15 @@ import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
 
+import pytest
+
+# the launcher is a tkinter window; a python without tkinter cannot even import it
+pytest.importorskip("tkinter")
+
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(TESTS_DIR)
 sys.path.insert(0, TESTS_DIR)
 
-from helpers import run_tests  # noqa: E402
 
 # a .pyw is not importable by name, so load it from its path
 _loader = SourceFileLoader("launcher", os.path.join(ROOT_DIR, "launcher.pyw"))
@@ -150,7 +154,3 @@ def test_real_paths(tmp):
     assert os.path.isfile(os.path.join(launcher.CLIENT_DIR, "app.py"))
     assert launcher.SERVER_CONFIG == os.path.join(launcher.SERVER_DIR, "data", "config.json")
     assert launcher.CLIENT_DATA_DIR == os.path.join(launcher.CLIENT_DIR, "data")
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

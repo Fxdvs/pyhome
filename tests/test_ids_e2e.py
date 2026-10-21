@@ -8,7 +8,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -56,7 +55,3 @@ def test_readable_ids_and_prefixes(tmp):
         assert "does not follow the id rule" not in system.log("kuchyna-svetlo")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

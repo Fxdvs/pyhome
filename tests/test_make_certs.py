@@ -17,7 +17,6 @@ sys.path.insert(0, ROOT_DIR)
 from cryptography import x509  # noqa: E402
 from cryptography.x509.oid import ExtendedKeyUsageOID  # noqa: E402
 import make_certs  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 FILES = ["ca.crt", "ca.key", "server.crt", "server.key"]
 
@@ -211,7 +210,3 @@ def test_certs_are_ignored_by_git(tmp):
     except FileNotFoundError:
         return  # no git on this machine, nothing to check
     assert result.stdout.split() == paths, result.stdout
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

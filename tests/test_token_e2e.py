@@ -7,7 +7,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 TOKEN = "s3cret-e2e"
 WRONG = "wrong-guess-123"
@@ -78,7 +77,3 @@ def test_no_token_accepts_everyone_with_a_warning(tmp):
         assert "anyone who can reach the dashboard" in system.log("server"), system.log("server")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

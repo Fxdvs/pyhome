@@ -14,7 +14,6 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 from handlers import tls  # noqa: E402
 import make_certs  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 
 def use_server_config(tmp, **values):
@@ -112,7 +111,3 @@ def test_uvicorn_options(tmp):
         "ssl_certfile": os.path.join(tmp, "certs", "server.crt"),
         "ssl_keyfile": os.path.join(tmp, "certs", "server.key"),
     }
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

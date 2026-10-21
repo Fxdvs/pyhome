@@ -5,7 +5,7 @@ from shared.colors import GREEN, RED, RESET
 from shared.config import get_config, get_config_file, get_config_path
 from shared.console import print_message
 from shared.protocol import DENIED, HELLO, STATE, WELCOME, ProtocolError, read_message, send_message
-from handlers.device_handler import GET_STATE, get_capabilities, get_device, run_action
+from client_handlers.device_handler import GET_STATE, get_capabilities, get_device, run_action
 
 RETRY_SECONDS = 15
 HANDSHAKE_TIMEOUT = 10

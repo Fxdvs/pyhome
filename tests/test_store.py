@@ -14,7 +14,6 @@ sys.path.insert(0, ROOT_DIR)
 
 from shared import config  # noqa: E402
 from handlers import store  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 
 def use_server_config(tmp):
@@ -222,7 +221,3 @@ def test_database_files_are_ignored_by_git(tmp):
 def test_now_iso(tmp):
     stamp = store.now_iso()
     assert len(stamp) == 20 and stamp.endswith("Z") and stamp[10] == "T", stamp
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

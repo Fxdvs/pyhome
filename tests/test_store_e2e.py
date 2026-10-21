@@ -8,7 +8,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 
 def test_clients_are_remembered_across_a_restart(tmp):
@@ -62,7 +61,3 @@ def test_a_newer_database_stops_the_server(tmp):
         assert "pyhome.db is version 99, this server knows up to 1" in system.log("server"), system.log("server")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

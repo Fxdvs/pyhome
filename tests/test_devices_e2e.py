@@ -15,7 +15,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import System, wait_for, with_system  # noqa: E402,F401
-from helpers import run_tests  # noqa: E402
 
 
 def test_done_when(tmp):
@@ -86,7 +85,3 @@ def test_handshake_and_unknown_type(tmp):
             assert raw is not None and raw["device"] is None and raw["capabilities"] == [], raw
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

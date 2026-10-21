@@ -16,7 +16,6 @@ from shared import config  # noqa: E402
 from shared import protocol  # noqa: E402
 from shared.protocol import read_message, send_message  # noqa: E402
 from handlers import client_handler, store  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 NEEDS_TOKEN = "this server needs a token, set TOKEN in the client's config"
 
@@ -133,7 +132,3 @@ def test_accepted_client_gets_welcome(tmp):
     assert "token" not in answer, "welcome must not echo the token"
     assert known == ["good"], known
     assert "s3cret" not in out
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

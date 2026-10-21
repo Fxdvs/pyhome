@@ -1,8 +1,8 @@
 from shared.colors import GREEN, RED, RESET
 from shared.config import get_config
 from shared.console import print_info
-from handlers.connection_handler import connection
-from handlers.device_handler import get_capabilities
+from client_handlers.connection_handler import connection
+from client_handlers.device_handler import get_capabilities
 
 command = ["about", "self", "info"]
 description = "Information about the application"

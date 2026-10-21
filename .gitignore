@@ -9,3 +9,6 @@ server/**/pyhome.db*
 
 # keys must never be committed, and a house's ca.crt is not the project's
 **/certs/
+
+# pytest
+.pytest_cache/

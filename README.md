@@ -106,12 +106,12 @@ pyhome/
 │   ├── app.py                    entry point
 │   ├── devices/                  one package per kind of device (light, thermostat)
 │   ├── data/config.json          client identity and which server to reach
-│   └── handlers/
+│   └── client_handlers/          named apart from the server's handlers, so pytest can import both
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
 │       ├── device_handler.py     loads the device and runs its actions
 │       └── commands/             client only commands
-├── tests/                        plain scripts, run all with py tests/run_all.py
+├── tests/                        pytest, run all with py -m pytest
 └── launcher.pyw                  GUI that starts and stops the server and clients
 ```
 
@@ -456,11 +456,21 @@ The server stores every client it has seen in `pyhome.db`, see
 
 ## Tests
 
-Plain scripts with asserts, no framework needed:
+The tests use [pytest](https://pytest.org):
 
 ```
-py tests/run_all.py
+py -m pip install -r requirements.txt -r requirements-dev.txt
+py -m pytest                       everything
+py -m pytest -m "not e2e"          the quick ones, about 10 s
+py -m pytest tests/test_store.py   one file
+py -m pytest -k token              by name
 ```
+
+Files named `*_e2e.py` start a real server and real clients as processes, on
+free ports and from temp configs, so they never touch `server/data/`. They
+are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
+
+The launcher's tests are skipped on a Python without `tkinter`.
 
 ## Known limitations
 

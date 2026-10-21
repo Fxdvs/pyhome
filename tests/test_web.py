@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
 sys.path.insert(0, ROOT_DIR)
 
 from handlers import client_handler, web_handler  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 INDEX = os.path.join(ROOT_DIR, "server", "web", "index.html")
 
@@ -60,7 +59,3 @@ def test_demo_data_only_outside_the_server(tmp):
 
 def test_thermostat_off_is_shown_as_off(tmp):
     assert "Vypnutý" in read_index()
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

@@ -7,7 +7,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(TESTS_DIR))
 
 from shared import config  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 
 def write_json(path, data):
@@ -178,7 +177,3 @@ def test_argv_config_missing_file_exits(tmp):
     except SystemExit:
         return
     raise AssertionError("expected SystemExit")
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

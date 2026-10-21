@@ -2,7 +2,7 @@ import asyncio
 
 from shared.colors import GREEN, RESET
 from shared.protocol import MESSAGE, send_message
-from handlers.connection_handler import connection
+from client_handlers.connection_handler import connection
 
 command = ["send", "msg"]
 description = "Send message to server"

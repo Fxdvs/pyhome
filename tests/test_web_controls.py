@@ -15,7 +15,6 @@ sys.path.insert(0, ROOT_DIR)
 from fastapi import HTTPException  # noqa: E402
 from shared import config  # noqa: E402
 from handlers import client_handler, web_handler  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 LAMP = ("127.0.0.1", 1001)
 INDEX = os.path.join(ROOT_DIR, "server", "web", "index.html")
@@ -221,7 +220,3 @@ def test_page_shows_errors_for_a_while(tmp):
     page = read_index()
     assert "until: Date.now() + 4000" in page
     assert 'class="err"' in page
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

@@ -13,7 +13,6 @@ sys.path.insert(0, ROOT_DIR)
 from fastapi import HTTPException  # noqa: E402
 from shared import config  # noqa: E402
 from handlers import client_handler, web_handler  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 INDEX = os.path.join(ROOT_DIR, "server", "web", "index.html")
 
@@ -174,7 +173,3 @@ def test_page_remembers_and_forgets_the_token(tmp):
     assert "Odhlásiť" in page and "Prihlásiť" in page
     assert "Nesprávny alebo zmenený token" in page
     assert "server nemá nastavený TOKEN" in page
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))
