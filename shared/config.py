@@ -118,6 +118,18 @@ def get_config(key, default=None):
     return load_config().get(key, default)
 
 
+def get_config_file(key):
+    """The absolute path a config key names, or None when it is empty.
+
+    A relative path is taken from the config file's folder, so an instance
+    started with --config finds its own certificates.
+    """
+    value = get_config(key)
+    if not value:
+        return None
+    return os.path.normpath(os.path.join(os.path.dirname(get_config_path()), str(value)))
+
+
 def set_config(key, value):
     config = dict(load_config())
     config[key] = value
