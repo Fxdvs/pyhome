@@ -89,5 +89,30 @@ def test_startup_lines(tmp):
     assert over[1] == (True, "The TLS certificate has expired, renew it with py server/make_certs.py"), over
 
 
+def test_ca_file_next_to_the_certificate(tmp):
+    make_certs.make_certs(os.path.join(tmp, "certs"), ["localhost"])
+    use_server_config(tmp, TLS_CERT="certs/server.crt", TLS_KEY="certs/server.key")
+    assert tls.ca_file() == os.path.join(tmp, "certs", "ca.crt")
+    os.remove(os.path.join(tmp, "certs", "ca.crt"))
+    assert tls.ca_file() is None
+    use_server_config(tmp)
+    assert tls.ca_file() is None
+
+
+def test_fingerprint_matches_make_certs(tmp):
+    ca_cert, _, _ = make_certs.make_certs(os.path.join(tmp, "certs"), ["localhost"])
+    assert tls.fingerprint(os.path.join(tmp, "certs", "ca.crt")) == make_certs.fingerprint(ca_cert)
+
+
+def test_uvicorn_options(tmp):
+    use_server_config(tmp)
+    assert tls.uvicorn_options() == {}
+    use_server_config(tmp, TLS_CERT="certs/server.crt", TLS_KEY="certs/server.key")
+    assert tls.uvicorn_options() == {
+        "ssl_certfile": os.path.join(tmp, "certs", "server.crt"),
+        "ssl_keyfile": os.path.join(tmp, "certs", "server.key"),
+    }
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
