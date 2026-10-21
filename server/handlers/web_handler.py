@@ -4,10 +4,11 @@ import math
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from shared.colors import GRAY, RESET
 from shared.console import print_message
+from handlers.tls import ca_file
 from handlers.client_handler import (
     COMMAND_TIMEOUT,
     get_connected_clients,
@@ -138,6 +139,19 @@ async def dashboard_do(client_id, body, source, timeout=COMMAND_TIMEOUT):
     if result.get("ok") is True:
         return 200, {"ok": True, "state": result.get("state")}
     return 200, {"ok": False, "error": str(result.get("error") or "the device refused")}
+
+
+# no token needed: a phone fetches it before it trusts this server, and it is public by nature
+@app.get("/ca.crt")
+async def ca_certificate():
+    path = ca_file()
+    if path is None:
+        raise HTTPException(status_code=404, detail="this server has no ca.crt next to its TLS_CERT")
+    with open(path, "rb") as f:
+        data = f.read()
+    # this type makes android and windows offer to install it
+    return Response(data, media_type="application/x-x509-ca-cert",
+                    headers={"Content-Disposition": 'attachment; filename="pyhome-ca.crt"'})
 
 
 # no token needed, the page asks here whether it has to show the prompt and the controls

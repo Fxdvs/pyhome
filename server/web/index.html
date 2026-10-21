@@ -368,6 +368,7 @@ function render(clients, demo) {
   const caps = clients.reduce((n, c) => n + (c.capabilities || []).length, 0);
   document.getElementById("serverRows").innerHTML = `
     <div class="row"><span>Zdroj</span><span>${demo ? "demo" : "/api/clients"}</span></div>
+    <div class="row"><span>Spojenie</span><span>${https() ? '<a href="/ca.crt">HTTPS · ca.crt</a>' : "HTTP, nešifrované"}</span></div>
     <div class="row"><span>So zariadením</span><span>${withDev}</span></div>
     <div class="row"><span>Akcie celkom</span><span>${caps}</span></div>`;
 
@@ -488,6 +489,16 @@ function showOffline() {
   document.getElementById("updated").textContent = "Naposledy skúšané " + new Date().toLocaleTimeString("sk-SK");
 }
 
+const https = () => location.protocol === "https:";
+
+// telefón, ktorý ešte nedôveruje ca.crt, si ho stiahne priamo zo servera
+function caLine() {
+  return https()
+    ? `<div class="sub">Prvé pripojenie z tohto zariadenia? <a href="/ca.crt">Stiahni ca.crt</a>,
+       nainštaluj ho a porovnaj odtlačok SHA-256 s tým, čo vypísal server.</div>`
+    : "";
+}
+
 function showLogin(message) {
   loginShown = true;
   document.getElementById("logout").style.display = "none";
@@ -502,6 +513,7 @@ function showLogin(message) {
   document.getElementById("clients").innerHTML = `<div class="card span2 login">
     <div class="name">Dashboard je chránený tokenom</div>
     <div class="sub">Zadaj TOKEN z konfigurácie servera.</div>
+    ${caLine()}
     <form class="login-row" id="loginForm">
       <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Token" required>
       <button class="btn" type="submit">Prihlásiť</button>

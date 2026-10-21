@@ -132,6 +132,20 @@ def test_id_warning(tmp):
     assert config.id_warning("all") == "ID 'all' is reserved for send all, choose another"
 
 
+def test_config_file_paths(tmp):
+    folder = os.path.join(tmp, "data")
+    os.makedirs(folder)
+    path = os.path.join(folder, "server.json")
+    absolute = os.path.join(tmp, "elsewhere", "ca.crt")
+    write_json(path, {"ID": "s", "TLS_CERT": "certs/server.crt", "TLS_CA": absolute, "TLS_KEY": ""})
+    config.init(tmp, path)
+    # relative to the config's folder, not to the working directory
+    assert config.get_config_file("TLS_CERT") == os.path.join(folder, "certs", "server.crt")
+    assert config.get_config_file("TLS_CA") == os.path.normpath(absolute)
+    assert config.get_config_file("TLS_KEY") is None
+    assert config.get_config_file("MISSING") is None
+
+
 def test_argv_without_config(tmp):
     assert config.config_file_from_argv(["app.py"]) is None
 

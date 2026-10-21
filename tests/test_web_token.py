@@ -126,6 +126,38 @@ def test_handshake_still_refuses_what_it_refused(tmp):
     assert "needs a token" in client_handler.check_token({})
 
 
+def test_ca_crt_is_served_without_a_token(tmp):
+    sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
+    import make_certs
+    make_certs.make_certs(os.path.join(tmp, "certs"), ["localhost"])
+    use_server_config(tmp, TOKEN="s3cret", TLS_CERT="certs/server.crt", TLS_KEY="certs/server.key")
+    response = asyncio.run(web_handler.ca_certificate())
+    with open(os.path.join(tmp, "certs", "ca.crt"), "rb") as f:
+        assert response.body == f.read()
+    assert response.media_type == "application/x-x509-ca-cert"
+    assert 'filename="pyhome-ca.crt"' in response.headers["content-disposition"]
+    route = next(r for r in web_handler.app.routes if getattr(r, "path", "") == "/ca.crt")
+    assert route.dependencies == [], "a phone fetches it before it has the token"
+
+
+def test_ca_crt_without_tls_is_404(tmp):
+    use_server_config(tmp, TOKEN="s3cret")
+    try:
+        asyncio.run(web_handler.ca_certificate())
+    except HTTPException as e:
+        assert e.status_code == 404 and "no ca.crt" in e.detail, (e.status_code, e.detail)
+    else:
+        raise AssertionError("expected 404")
+
+
+def test_page_offers_ca_crt_over_https(tmp):
+    page = read_index()
+    assert 'const https = () => location.protocol === "https:";' in page
+    assert '<a href="/ca.crt">Stiahni ca.crt</a>' in page
+    assert "${caLine()}" in page
+    assert "HTTP, nešifrované" in page
+
+
 def test_page_sends_the_token_in_a_header(tmp):
     page = read_index()
     assert '"/api/status"' in page

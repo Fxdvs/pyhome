@@ -5,6 +5,7 @@ Not a test file itself, the test_*_e2e.py files import it.
 import json
 import os
 import socket
+import ssl
 import subprocess
 import sys
 import time
@@ -58,6 +59,9 @@ class System:
         self.server = None
         # the server's TOKEN, sent to the dashboard API once the server has one
         self.token = None
+        # with TLS the dashboard is https, verified against the server's own ca.crt
+        self.scheme = "http"
+        self.context = None
 
     def start(self, name, app_dir, config, stdin=subprocess.DEVNULL):
         config_path = os.path.join(self.tmp, f"{name}.json")
@@ -77,6 +81,12 @@ class System:
 
     def start_server(self, **extra):
         self.token = extra.get("TOKEN") or None
+        if extra.get("TLS_CERT"):
+            # make_certs.py puts ca.crt next to server.crt
+            ca = os.path.join(os.path.dirname(os.path.join(self.tmp, extra["TLS_CERT"])), "ca.crt")
+            self.scheme = "https"
+            # full verification, host name included, the way a browser does it
+            self.context = ssl.create_default_context(cafile=ca)
         self.server = self.start("server", SERVER_DIR, {
             "ID": "e2e-server", "NAME": "E2E server", "TYPE": "server", "VERSION": "test",
             "HOST": "127.0.0.1", "PORT": self.port,
@@ -92,12 +102,15 @@ class System:
             **extra,
         })
 
+    def url(self, path):
+        return f"{self.scheme}://127.0.0.1:{self.web_port}{path}"
+
     def http(self, path, token=None):
         """(status, parsed JSON body) of a GET to the dashboard. Raises when it does not answer."""
         headers = {"Authorization": f"Bearer {token}"} if token else {}
-        request = urllib.request.Request(f"http://127.0.0.1:{self.web_port}{path}", headers=headers)
+        request = urllib.request.Request(self.url(path), headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=2) as r:
+            with urllib.request.urlopen(request, timeout=2, context=self.context) as r:
                 return r.status, json.load(r)
         except urllib.error.HTTPError as e:
             # an error status still carries a body, read it like a success
@@ -110,9 +123,9 @@ class System:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         data = json.dumps(body).encode("utf-8")
-        request = urllib.request.Request(f"http://127.0.0.1:{self.web_port}{path}", data=data, headers=headers)
+        request = urllib.request.Request(self.url(path), data=data, headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=10) as r:
+            with urllib.request.urlopen(request, timeout=10, context=self.context) as r:
                 return r.status, json.load(r)
         except urllib.error.HTTPError as e:
             with e:

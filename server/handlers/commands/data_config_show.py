@@ -16,6 +16,7 @@ async def function():
         ("Host/Address:", get_config("HOST")),
         ("Port:", get_config("PORT")),
         ("Token:", "set" if get_config("TOKEN") else f"{RED}not set{RESET}"),
+        ("TLS:", "on" if get_config("TLS_CERT") else f"{RED}off{RESET}"),
         ("Web host/Address:", get_config("WEB_HOST", "0.0.0.0")),
         ("Web port:", get_config("WEB_PORT", 50001)),
     ])

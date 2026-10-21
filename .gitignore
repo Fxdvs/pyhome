@@ -2,3 +2,6 @@
 
 # runtime state, the server writes this next to whatever config it was started with
 server/**/clients.json
+
+# keys must never be committed, and a house's ca.crt is not the project's
+**/certs/
