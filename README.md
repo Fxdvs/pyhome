@@ -135,6 +135,18 @@ Dashboard running on http://localhost:50001
                      http://192.168.1.20:50001
 ```
 
+If a port is taken, almost always by a server that is still running in
+another window, the server stops before touching anything and says how to
+find it:
+
+```
+✘ Port 50000 for the clients is already in use, probably by another pyhome server.
+  Find it with: netstat -ano | findstr :50000
+```
+
+The last number on the `LISTENING` line is the process id, `taskkill /PID <id>`
+ends it.
+
 ## Project structure
 
 ```
@@ -196,6 +208,7 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `WEB_HOST` | server only, address the dashboard binds to |
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 | `TLS_CERT`, `TLS_KEY` | server only, its certificate and key, relative to the config's folder. Empty for none |
+| `HISTORY_DAYS` | server only, how many days of device history `pyhome.db` keeps, `90` by default, `0` keeps none |
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
@@ -209,7 +222,7 @@ with, `server/data/` by default:
 | --- | --- |
 | `config.json` | the server's settings |
 | `certs/` | the TLS files from `make_certs.py` |
-| `pyhome.db` | the database: every client seen so far, with its device and capabilities. Created at the first start |
+| `pyhome.db` | the database: every client seen so far with its device and capabilities, the last state of every device, and the history of every change. Created at the first start |
 
 That one folder is all a backup or a Docker volume needs. `pyhome.db` is a
 SQLite file, which the server reads and writes through SQLAlchemy 2.0 ORM
@@ -217,6 +230,27 @@ classes in `server/handlers/store.py`. Any SQLite browser opens it (for example
 [DB Browser for SQLite](https://sqlitebrowser.org)). Copy it only while the
 server is stopped: while it runs, part of the data is in `pyhome.db-wal` next
 to it.
+
+**History.** Every time a device's state changes, the server stores the new
+state with the time and where the change came from:
+
+| Source | When |
+| --- | --- |
+| `client` | the client sent its state on its own: when it connects, or after a change on the device itself |
+| `console` | the answer to `do` or `state` typed on the server |
+| `dashboard 192.168.1.30` | the answer to a browser action, with the browser's address |
+
+Only changes are stored: asking `state` ten times adds nothing. Entries older
+than `HISTORY_DAYS` are removed at startup and once a day. A light switched
+50 times a day takes about half a megabyte in 90 days. The last state of each
+device is kept as well, so after a restart the server knows how every device
+was before its client says so again.
+
+The server prints what it holds when it starts:
+
+```
+Database server/data/pyhome.db, 4 clients known, 1230 history entries, 12 older than 90 days removed
+```
 
 A server upgraded from 1.2 or older imports its `clients.json` into the
 database at the first start and renames it to `clients.json.imported`, which
