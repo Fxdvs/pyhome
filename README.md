@@ -479,18 +479,19 @@ code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
+| 1.3 | Remembers what it knows ([spec](docs/v1.3-spec.md)) | A SQLite store, `clients.json` imported once, the last device state across restarts, a 90 day history of every change, offline devices on the dashboard |
 | 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+| 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
 Everything that is possible but not planned yet:
 
 | Idea | Why it is not done yet | Version |
 | --- | --- | --- |
-| Persisting device state | Losing it on restart is acceptable for now, the client can be asked again | 1.3 |
-| `clients.json` as a dict keyed by id | Changing it means migrating existing files | 1.3 |
-| Devices from several folders | Nothing needs it yet | 1.3 |
+| Devices from several folders | Nothing needs it yet | later |
 | Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
 | Choosing between several servers | One server is enough so far | 1.4 |
 | Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
 | Automations, rules and schedules | Not specified yet | later |
+| History charts on the dashboard | The history is recorded from 1.3, drawing it is its own piece of work | later |
+| A cloud copy for remote viewing | The house must work offline, a copy could only ever be an add-on | later |
 | More device types (sensor, switch, blinds) | Light and thermostat cover the contract for now | later |
