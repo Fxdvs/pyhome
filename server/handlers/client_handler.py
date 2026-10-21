@@ -43,7 +43,7 @@ def get_server_info():
 connected_clients = {}
 clients_lock = asyncio.Lock()
 
-# request_id -> (addr of the client asked, future the result completes)
+# request_id -> (addr of the client asked, future the result completes, source for the history)
 pending_requests = {}
 
 
@@ -173,8 +173,8 @@ async def handle_client_async(reader, writer):
                 "writer": writer,
                 "device": clean_device(hello.get("device")),
                 "capabilities": clean_capabilities(hello.get("capabilities")),
-                # only in memory, the client can be asked again after a restart
-                "last_state": None,
+                # what the server remembers, until the client says otherwise a moment later
+                "last_state": store.get_state(client_id),
             }
 
         info = connected_clients[addr]
@@ -233,44 +233,56 @@ def handle_message(addr, label, message):
         print_message(f"From client {GREEN}{label}{RESET}: {text}")
 
     elif message_type == RESULT:
-        if not resolve_request(addr, message):
+        source = resolve_request(addr, message)
+        if source is None:
             print_message(f"{GRAY}Result from {label} that nobody is waiting for{RESET}")
         state = message.get("state")
         if message.get("ok") is True and isinstance(state, dict):
-            connected_clients[addr]["last_state"] = state
+            # a late result has lost who asked, it is recorded as the client's own
+            remember_state(addr, state, source or "client")
 
     elif message_type == STATE:
         state = message.get("state")
         if isinstance(state, dict):
-            connected_clients[addr]["last_state"] = state
+            remember_state(addr, state, "client")
             print_message(f"{GRAY}State from {label}: {json.dumps(state, ensure_ascii=False)}{RESET}")
 
     else:
         print_message(f"{GRAY}Ignored '{message_type}' from {label}{RESET}")
 
 
+def remember_state(addr, state, source):
+    """The client's newest state, in memory for the dashboard and in the store for after a restart."""
+    info = connected_clients[addr]
+    info["last_state"] = state
+    store.save_state(info["id"], state, source)
+
+
 def resolve_request(addr, message):
-    """Complete the request this result answers. False when nothing is waiting for it."""
+    """Complete the request this result answers. Returns who asked, None when nothing is waiting for it."""
     request_id = message.get("request_id")
     # a request_id we handed out is always a str; anything else cannot be a hit
     if not isinstance(request_id, str):
-        return False
+        return None
     entry = pending_requests.get(request_id)
     # an answer from another client, or to a request that already timed out
     if entry is None or entry[0] != addr or entry[1].done():
-        return False
+        return None
     entry[1].set_result(message)
-    return True
+    return entry[2]
 
 
 def fail_pending_requests(addr):
-    for request_addr, future in pending_requests.values():
+    for request_addr, future, _ in pending_requests.values():
         if request_addr == addr and not future.done():
             future.set_exception(ConnectionError("client disconnected"))
 
 
-async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
+async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT, source="console"):
     """Send cmd to the online client client_id names and wait for its result.
+
+    source is who asked, recorded with the state the result brings:
+    "console", or "dashboard <address>".
 
     client_id is an id or the start of one, see find_online_client. Returns
     the result message. Raises LookupError when it names no online client or
@@ -289,7 +301,7 @@ async def send_command(client_id, action, params, timeout=COMMAND_TIMEOUT):
 
     request_id = uuid4().hex[:8]
     future = asyncio.get_running_loop().create_future()
-    pending_requests[request_id] = (addr, future)
+    pending_requests[request_id] = (addr, future, source)
     try:
         await send_message(info["writer"], CMD, action=action, params=params, request_id=request_id)
         return await asyncio.wait_for(future, timeout)

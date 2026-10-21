@@ -13,7 +13,12 @@ sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
 sys.path.insert(0, ROOT_DIR)
 
 from shared import config  # noqa: E402
-from handlers import client_handler  # noqa: E402
+from handlers import client_handler, store  # noqa: E402
+
+import pytest  # noqa: E402
+
+# fake clients go through the store like real ones
+pytestmark = pytest.mark.usefixtures("store_db")
 from handlers.devices import parse_params, parse_value  # noqa: E402
 
 LAMP = ("127.0.0.1", 1001)
@@ -37,6 +42,8 @@ def add_client(addr, client_id):
         "name": client_id.title(), "id": client_id, "writer": writer,
         "device": "light", "capabilities": ["turn_on", "turn_off", "set_brightness"], "last_state": None,
     }
+    # what the handshake does for a real client, the server stores every state it hears
+    store.upsert_client(client_id, client_id.title(), "light", ["turn_on", "turn_off", "set_brightness"])
     return writer
 
 

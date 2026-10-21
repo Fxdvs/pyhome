@@ -9,5 +9,6 @@
     "TLS_CERT": "",
     "TLS_KEY": "",
     "WEB_HOST": "0.0.0.0",
-    "WEB_PORT": 50001
+    "WEB_PORT": 50001,
+    "HISTORY_DAYS": 90
 }
