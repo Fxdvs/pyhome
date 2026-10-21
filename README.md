@@ -227,9 +227,11 @@ with, `server/data/` by default:
 That one folder is all a backup or a Docker volume needs. `pyhome.db` is a
 SQLite file, which the server reads and writes through SQLAlchemy 2.0 ORM
 classes in `server/handlers/store.py`. Any SQLite browser opens it (for example
-[DB Browser for SQLite](https://sqlitebrowser.org)). Copy it only while the
-server is stopped: while it runs, part of the data is in `pyhome.db-wal` next
-to it.
+[DB Browser for SQLite](https://sqlitebrowser.org)); open it with **Open
+Database Read Only** while the server runs. Copy it only while the server is
+stopped: while it runs, part of the data is in `pyhome.db-wal` next to it.
+`data backup` on the server console makes a consistent copy any time, as
+`pyhome-backup-<date>-<time>.db` next to it.
 
 **History.** Every time a device's state changes, the server stores the new
 state with the time and where the change came from:
@@ -353,17 +355,21 @@ Type commands at the `>` prompt. Every command has aliases.
 | --- | --- | --- |
 | `about` | `self`, `info` | Information about the application |
 | `clear` | `cls` | Clears the console |
-| `data clients clear` | `data clients cls` | Clears the client list |
+| `data backup` | | Writes a consistent copy of `pyhome.db` next to it, safe while the server runs |
+| `data clients clear` | `data clients cls` | Clears the client list with their state and history; clients still connected stay known |
 | `data config edit name` | `data conf edit name` | Edits the server name |
 | `data config show` | `data conf show` | Shows formatted config.json |
 | `do <id> <action> [key=value ...]` | | Runs a device action on a client and prints the result with the full id. An action the device does not list is refused before anything is sent |
 | `help` | `commands`, `?` | Lists all available commands |
-| `list` | `ls` | Lists all clients, online ones in green |
+| `history <id> [count]` | | The last state changes of a client with time and source, 10 by default; an offline client by its full id |
+| `list` | `ls` | Lists all clients, online ones in green, offline ones with when they were last seen |
 | `send <id\|all> <message>` | `msg` | Sends a message to one client or to all |
 | `shutdown` | `exit`, `quit` | Shuts down the server |
 | `state <id>` | | Asks a client for its device state |
 
-`<id>` in `do`, `state` and `send` may be the start of an id, see [Ids](#ids).
+`<id>` in `do`, `state`, `send` and `history` may be the start of an online client's id, see [Ids](#ids).
+Questions such as the one `data clients clear` asks are read off the event loop, so
+the server keeps answering clients and the dashboard while it waits for y or n.
 
 **Client**
 
@@ -428,9 +434,14 @@ The server runs FastAPI on port `50001`:
 | --- | --- |
 | `GET /` | the dashboard page (`server/web/index.html`), one card per connected client with its device, capabilities and last state, refreshed every 2 s |
 | `GET /api/status` | `{"token_required": true, "controls": true}`, both `false` without a `TOKEN`. No token needed, the page reads it first |
-| `GET /api/clients` | the connected clients as JSON, which the page reads. Needs the token when the server has one |
+| `GET /api/clients` | every known client as JSON, which the page reads: online ones first with `host` and `port`, then offline ones with their last state, `online: false` and `last_seen`. Needs the token when the server has one |
+| `GET /api/clients/<id>/history?limit=50` | the newest state changes of a client first, online or not, `limit` 1 to 500. Needs the token |
 | `POST /api/clients/<id>/do` | runs a device action, body `{"action": "set_brightness", "params": {"level": 40}}`. Needs the token, and a server without one refuses it with 403 |
 | `GET /ca.crt` | the authority certificate for phones to install, no token needed. 404 without TLS |
+
+The dashboard shows every client the server knows. One that is not connected
+is drawn gray, without controls, with its last known state and "Offline,
+naposledy 18:42". The overview counts both: "2 online z 4".
 
 ### HTTPS and phones
 
