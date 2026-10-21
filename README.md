@@ -93,10 +93,12 @@ pyhome/
 │   ├── make_certs.py             makes the TLS authority and server certificate
 │   ├── data/
 │   │   ├── config.json           server identity and network settings
-│   │   └── clients.json          every client seen so far, created at runtime
+│   │   ├── certs/                TLS files from make_certs.py, not in git
+│   │   └── pyhome.db             the server's database, created at runtime, not in git
 │   ├── web/index.html            dashboard page, renders itself from /api/clients
 │   └── handlers/
 │       ├── server_handler.py     opens the TCP listener
+│       ├── store.py              the SQLite database, the only module that speaks SQL
 │       ├── client_handler.py     one coroutine per connected client
 │       ├── web_handler.py        FastAPI dashboard
 │       └── commands/             server only commands
@@ -136,6 +138,28 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
+
+### Data folder
+
+Everything the server writes lives in the folder of the config it was started
+with, `server/data/` by default:
+
+| File | What |
+| --- | --- |
+| `config.json` | the server's settings |
+| `certs/` | the TLS files from `make_certs.py` |
+| `pyhome.db` | the database: every client seen so far, with its device and capabilities. Created at the first start |
+
+That one folder is all a backup or a Docker volume needs. `pyhome.db` is a
+SQLite file any SQLite browser opens (for example
+[DB Browser for SQLite](https://sqlitebrowser.org)). Copy it only while the
+server is stopped: while it runs, part of the data is in `pyhome.db-wal` next
+to it.
+
+A server upgraded from 1.2 or older imports its `clients.json` into the
+database at the first start and renames it to `clients.json.imported`, which
+stays as the backup. A database from a newer version than the server stops it
+with a message rather than being guessed at.
 
 ### Certificates
 
@@ -427,8 +451,8 @@ A connection goes:
 `type` is the envelope field, so a payload field never uses that name. The
 config's `TYPE` travels as `role`.
 
-The server stores every client it has seen in `clients.json` next to its
-config file. Device state is kept in memory only.
+The server stores every client it has seen in `pyhome.db`, see
+[Data folder](#data-folder).
 
 ## Tests
 
