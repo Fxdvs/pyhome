@@ -20,10 +20,12 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from shared.config import get_config_path
+from shared.config import get_config, get_config_path
 
 DB_NAME = "pyhome.db"
 LEGACY_CLIENTS = "clients.json"
+# how long the history is kept when the config does not say
+DEFAULT_HISTORY_DAYS = 90
 
 _engine = None
 
@@ -279,3 +281,76 @@ def clear_clients():
     # the database's ON DELETE CASCADE removes the rest, foreign keys are on for every connection
     with _session() as session, session.begin():
         return session.execute(delete(Client)).rowcount
+
+
+def _state_text(state):
+    # sorted keys, so the same state is always the same text in the database
+    return json.dumps(state, ensure_ascii=False, sort_keys=True)
+
+
+def get_state(client_id):
+    """The last stored state of a client, or None when none was ever stored."""
+    with _session() as session:
+        row = session.get(DeviceState, str(client_id))
+        return json.loads(row.state) if row else None
+
+
+def save_state(client_id, state, source):
+    """Store a client's state and, when it changed, add one history row with its source.
+
+    Returns True when the state changed. The same state again (a repeated
+    state request, a reconnect) writes nothing. The comparison is on the
+    parsed JSON, so key order does not matter.
+    """
+    client_id = str(client_id)
+    stamp = now_iso()
+    with _session() as session, session.begin():
+        row = session.get(DeviceState, client_id)
+        if row is not None and json.loads(row.state) == state:
+            return False
+        text = _state_text(state)
+        if row is None:
+            session.add(DeviceState(client_id=client_id, state=text, updated_at=stamp))
+        else:
+            row.state = text
+            row.updated_at = stamp
+        session.add(StateHistory(client_id=client_id, at=stamp, state=text, source=str(source)))
+    return True
+
+
+def get_history(client_id, limit=50):
+    """The newest history entries of a client first, at most limit."""
+    with _session() as session:
+        rows = session.scalars(
+            select(StateHistory)
+            .where(StateHistory.client_id == str(client_id))
+            # the id breaks ties within one second, a later row is a later change
+            .order_by(StateHistory.at.desc(), StateHistory.id.desc())
+            .limit(limit))
+        return [{"at": row.at, "state": json.loads(row.state), "source": row.source} for row in rows]
+
+
+def count_history():
+    with _session() as session:
+        return session.scalar(select(func.count()).select_from(StateHistory))
+
+
+def history_days():
+    """HISTORY_DAYS from the config: 90 when missing or not a number, never below 0."""
+    try:
+        days = int(get_config("HISTORY_DAYS", DEFAULT_HISTORY_DAYS))
+    except (TypeError, ValueError):
+        days = DEFAULT_HISTORY_DAYS
+    return max(days, 0)
+
+
+def prune_history(days, now=None):
+    """Delete history older than days. 0 or less keeps none. Returns how many rows went."""
+    with _session() as session, session.begin():
+        statement = delete(StateHistory)
+        if days > 0:
+            now = now or datetime.datetime.now(datetime.timezone.utc)
+            cutoff = (now - datetime.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            # ISO 8601 text sorts like the time it names, so < compares times
+            statement = statement.where(StateHistory.at < cutoff)
+        return session.execute(statement).rowcount

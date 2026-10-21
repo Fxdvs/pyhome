@@ -123,7 +123,7 @@ async def dashboard_do(client_id, body, source, timeout=COMMAND_TIMEOUT):
                   f"{printable(action)} {printable(json.dumps(params, ensure_ascii=False), 120)}{RESET}")
 
     try:
-        result = await send_command(client_id, action, params, timeout)
+        result = await send_command(client_id, action, params, timeout, source=f"dashboard {source}")
     except LookupError as e:
         # it went offline between the check above and the send
         return 404, {"error": str(e)}

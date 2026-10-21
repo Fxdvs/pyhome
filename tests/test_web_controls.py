@@ -14,7 +14,12 @@ sys.path.insert(0, ROOT_DIR)
 
 from fastapi import HTTPException  # noqa: E402
 from shared import config  # noqa: E402
-from handlers import client_handler, web_handler  # noqa: E402
+from handlers import client_handler, store, web_handler  # noqa: E402
+
+import pytest  # noqa: E402
+
+# fake clients go through the store like real ones
+pytestmark = pytest.mark.usefixtures("store_db")
 
 LAMP = ("127.0.0.1", 1001)
 INDEX = os.path.join(ROOT_DIR, "server", "web", "index.html")
@@ -47,6 +52,8 @@ def add_lamp():
         "name": "Lamp", "id": "lamp", "writer": writer, "device": "light",
         "capabilities": ["turn_on", "turn_off", "set_brightness"], "last_state": None,
     }
+    # what the handshake does for a real client, the server stores every state it hears
+    store.upsert_client("lamp", "Lamp", "light", ["turn_on", "turn_off", "set_brightness"])
     return writer
 
 

@@ -13,7 +13,12 @@ sys.path.insert(0, TESTS_DIR)
 sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
 sys.path.insert(0, ROOT_DIR)
 
-from handlers import client_handler  # noqa: E402
+from handlers import client_handler, store  # noqa: E402
+
+import pytest  # noqa: E402
+
+# fake clients go through the store like real ones
+pytestmark = pytest.mark.usefixtures("store_db")
 from handlers.devices import run_and_print  # noqa: E402
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -41,6 +46,8 @@ def online(*ids):
             "name": str(client_id).title(), "id": client_id, "writer": writers[client_id],
             "device": "light", "capabilities": ["turn_on"], "last_state": None,
         }
+        # what the handshake does for a real client, the server stores every state it hears
+        store.upsert_client(client_id, str(client_id).title(), "light", ["turn_on"])
     return writers
 
 
