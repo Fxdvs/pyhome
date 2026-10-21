@@ -9,7 +9,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `1.2`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.3`, see [Known limitations](#known-limitations).
 
 ## Architecture
 
@@ -614,16 +614,19 @@ Done:
 9. ~~Certificates made by the project itself~~ (1.2)
 10. ~~TLS on the client connection~~ (1.2)
 11. ~~HTTPS for the dashboard~~ (1.2)
+12. ~~A database for the server's memory~~ (1.3)
+13. ~~Device state and history across restarts~~ (1.3)
+14. ~~Offline devices and history on the dashboard and the console~~ (1.3)
 
 What each version delivered is in [docs/versions/](docs/versions/README.md).
 
 Next, one theme per version. Each gets its own spec in `docs/` before any
 code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
-[docs/v1.1-spec.md](docs/v1.1-spec.md) and [docs/v1.2-spec.md](docs/v1.2-spec.md) did.
+[docs/v1.1-spec.md](docs/v1.1-spec.md), [docs/v1.2-spec.md](docs/v1.2-spec.md) and
+[docs/v1.3-spec.md](docs/v1.3-spec.md) did.
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.3 | Remembers what it knows ([spec](docs/v1.3-spec.md)) | A SQLite store, `clients.json` imported once, the last device state across restarts, a 90 day history of every change, offline devices on the dashboard |
 | 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
 | 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
