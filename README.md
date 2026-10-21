@@ -11,6 +11,64 @@ Both sides run as a console application with their own command prompt.
 
 **Status:** server and client `1.2`, see [Known limitations](#known-limitations).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph house["Home network"]
+        light["Client<br/>kuchyna-svetlo<br/><i>light</i>"]
+        thermo["Client<br/>obyvacka-termostat<br/><i>thermostat</i>"]
+        phone["Phone or browser"]
+    end
+
+    subgraph server["Server: one asyncio event loop"]
+        tcp["Client listener :50000<br/>asyncio streams"]
+        web["Dashboard :50001<br/>FastAPI + uvicorn"]
+        console["Console<br/>do · state · send · list"]
+        registry["Online clients<br/>pending requests"]
+        store[("pyhome.db<br/>SQLite")]
+    end
+
+    light -- "TLS · newline JSON<br/>hello, cmd, result, state" --> tcp
+    thermo -- "TLS" --> tcp
+    phone -- "HTTPS · Bearer token" --> web
+    tcp --- registry
+    web -- "send_command" --> registry
+    console -- "send_command" --> registry
+    tcp -- "clients" --> store
+```
+
+The server is one process and one asyncio event loop. The client listener, the
+FastAPI dashboard and the console prompt all run in it through
+`asyncio.gather`, so a browser action awaits the very same `send_command`
+the console's `do` uses, with no threads and no queues between them. Each
+client is its own process, on the server's computer or anywhere in the house,
+and needs nothing beyond the standard library.
+
+What happens when the dashboard switches a light:
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant W as Dashboard (FastAPI)
+    participant S as Server (asyncio)
+    participant C as Client kuchyna-svetlo
+
+    B->>W: POST /api/clients/kuchyna-svetlo/do<br/>{"action": "turn_on"} + Bearer token
+    W->>W: check token, body, capabilities
+    W->>S: await send_command(...)
+    S->>C: cmd {action, params, request_id}
+    C->>C: device runs turn_on
+    C-->>S: result {request_id, ok, state}
+    S-->>W: the result, matched by request_id
+    W-->>B: 200 {"ok": true, "state": {"on": true}}
+    Note over B: the card updates at once
+```
+
+Several commands can be in flight at once: each `cmd` carries a
+`request_id`, and the server completes the waiting request whose id the
+`result` names.
+
 ## Requirements
 
 - Python 3.10 or newer
