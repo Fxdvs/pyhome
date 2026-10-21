@@ -1,5 +1,7 @@
 # pyhome
 
+[![tests](https://github.com/Fxdvs/pyhome/actions/workflows/tests.yml/badge.svg)](https://github.com/Fxdvs/pyhome/actions/workflows/tests.yml)
+
 A small smart home system written in Python: one server, many clients, and a web
 dashboard. The server accepts client connections over TCP, keeps track of who is
 online, and serves a dashboard. Clients and the server exchange messages in both
@@ -112,6 +114,7 @@ pyhome/
 │       ├── device_handler.py     loads the device and runs its actions
 │       └── commands/             client only commands
 ├── tests/                        pytest, run all with py -m pytest
+├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
 └── launcher.pyw                  GUI that starts and stops the server and clients
 ```
 
@@ -470,7 +473,10 @@ Files named `*_e2e.py` start a real server and real clients as processes, on
 free ports and from temp configs, so they never touch `server/data/`. They
 are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
 
-The launcher's tests are skipped on a Python without `tkinter`.
+GitHub Actions runs the whole suite on every push and pull request, on
+Ubuntu and Windows with Python 3.10 and 3.13
+([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher's
+tests are skipped on a Python without `tkinter`.
 
 ## Known limitations
 
