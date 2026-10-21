@@ -18,8 +18,9 @@ from shared.config import get_config  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
 from shared.network import get_local_ip  # noqa: E402
-from shared.symbols import WARNING  # noqa: E402
+from shared.symbols import ERROR, WARNING  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
+from handlers.store import StoreError, count_clients, get_store_path, open_store  # noqa: E402
 from handlers.web_handler import app, dashboard_warning  # noqa: E402
 from handlers.tls import ca_file, fingerprint, uvicorn_options  # noqa: E402
 
@@ -78,7 +79,21 @@ def print_web_url():
         print(f"{WARNING} {YELLOW}{warning}{RESET}")
 
 # run handlers in parallel
+def open_database():
+    """Open pyhome.db before anything can connect. A database that cannot be used stops the server."""
+    path = get_store_path()
+    try:
+        imported = open_store(path)
+    except StoreError as e:
+        sys.exit(f"{ERROR} {e}")
+    shown = os.path.relpath(path, ROOT_DIR) if path.startswith(ROOT_DIR) else path
+    line = f"Database {shown}, {count_clients()} clients known"
+    if imported:
+        line += f", {imported} imported from clients.json"
+    print(line)
+
 async def main():
+    open_database()
     server = await start_server_async()
     print_web_url()
 

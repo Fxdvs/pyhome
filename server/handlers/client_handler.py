@@ -1,12 +1,12 @@
 import json
-import os
 import asyncio
 import hmac
 from uuid import uuid4
 
 from shared.colors import GRAY, GREEN, RED, RESET
-from shared.config import get_config, get_config_path
+from shared.config import get_config
 from shared.console import print_message
+from handlers import store
 from shared.protocol import (
     CMD,
     DENIED,
@@ -26,10 +26,6 @@ COMMAND_TIMEOUT = 5
 # every device answers this one, it is not in capabilities
 GET_STATE = "get_state"
 
-
-def get_clients_file():
-    """clients.json next to the config in use, so a server started with --config keeps its own list."""
-    return os.path.join(os.path.dirname(get_config_path()), "clients.json")
 
 # read at call time, so a renamed server is sent to clients right away
 def get_server_info():
@@ -181,7 +177,8 @@ async def handle_client_async(reader, writer):
                 "last_state": None,
             }
 
-        save_client(addr, client_name, client_id)
+        info = connected_clients[addr]
+        store.upsert_client(client_id, client_name, info["device"], info["capabilities"])
         print_message(f"Client {GREEN}{addr[0]}:{addr[1]}@{client_name}#{client_id}{RESET} has connected")
 
         # send information about server
@@ -215,36 +212,12 @@ async def handle_client_async(reader, writer):
         async with clients_lock:
             if addr in connected_clients:
                 client_info = connected_clients[addr]
+                store.touch_client(client_info["id"])
                 print_message(f"Client {RED}{addr[0]}:{addr[1]}@{client_info['name']}#{client_info['id']}{RESET} has disconnected")
                 del connected_clients[addr]
 
         writer.close()
         await writer.wait_closed()
-
-def save_client(addr, client_name, client_id):
-    clients_file = get_clients_file()
-    client_data = {"ID": client_id, "NAME": client_name}
-    clients = []
-    if os.path.exists(clients_file):
-        with open(clients_file, "r", encoding="utf-8") as f:
-            try:
-                clients = json.load(f)
-            except json.JSONDecodeError:
-                clients = []
-
-    # update or add
-    updated = False
-    for i, c in enumerate(clients):
-        if c.get("ID") == client_id:
-            clients[i] = client_data
-            updated = True
-            break
-
-    if not updated:
-        clients.append(client_data)
-
-    with open(clients_file, "w", encoding="utf-8") as f:
-        json.dump(clients, f, indent=4)
 
 # number of connected clients
 def get_connected_clients():

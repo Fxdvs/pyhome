@@ -2,9 +2,11 @@
 
 Not a test file itself, the test_*_e2e.py files import it.
 """
+import contextlib
 import json
 import os
 import socket
+import sqlite3
 import ssl
 import subprocess
 import sys
@@ -143,6 +145,12 @@ class System:
             if client["id"] == client_id:
                 return client
         return None
+
+    def known_ids(self):
+        """The ids in the server's pyhome.db, read the way any SQLite browser would, without writing."""
+        uri = "file:" + os.path.join(self.tmp, "pyhome.db").replace("\\", "/") + "?mode=ro"
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as db:
+            return sorted(row[0] for row in db.execute("SELECT id FROM clients"))
 
     def command(self, line):
         self.server.stdin.write((line + "\n").encode("utf-8"))

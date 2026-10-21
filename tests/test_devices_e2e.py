@@ -57,8 +57,8 @@ def test_done_when(tmp):
         with urllib.request.urlopen(f"http://127.0.0.1:{system.web_port}/", timeout=5) as r:
             assert "Pripojené zariadenia" in r.read().decode("utf-8")
 
-        # the clients files follow the temp config, the real one is untouched
-        assert os.path.exists(os.path.join(system.tmp, "clients.json"))
+        # the database follows the temp config, the real one is untouched
+        assert system.known_ids() == ["e2e-light", "e2e-thermo"], system.known_ids()
 
     with_system(tmp, scenario)
 
