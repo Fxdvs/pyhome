@@ -335,6 +335,9 @@ ca.crt** link on the login card (or `/ca.crt`), and install it:
   Settings
 - **Windows:** double click `ca.crt` → Install Certificate → Local Machine →
   Place all certificates in: Trusted Root Certification Authorities
+- **Firefox** keeps its own list and ignores the one in Windows: Settings →
+  Privacy & Security → Certificates → View Certificates → Authorities →
+  Import, pick `ca.crt`, tick "Trust this CA to identify websites"
 
 **Compare the fingerprint** the phone shows with the one the server printed
 before trusting it. That is what makes the first download safe: anyone in the
