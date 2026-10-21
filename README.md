@@ -12,7 +12,7 @@ Both sides run as a console application with their own command prompt.
 ## Requirements
 
 - Python 3.10 or newer
-- `fastapi` and `uvicorn`, for the server. The client needs nothing beyond the
+- `fastapi` and `uvicorn` for the server, `cryptography` for its certificate tool. The client needs nothing beyond the
   standard library.
 
 ```
@@ -90,6 +90,7 @@ pyhome/
 │   └── commands/                 commands both sides have
 ├── server/
 │   ├── app.py                    entry point, runs all handlers with asyncio.gather
+│   ├── make_certs.py             makes the TLS authority and server certificate
 │   ├── data/
 │   │   ├── config.json           server identity and network settings
 │   │   └── clients.json          every client seen so far, created at runtime
@@ -131,8 +132,41 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `TOKEN` | shared secret, the client sends it in `hello` and the dashboard asks for it. On the server, empty means every client is accepted and the dashboard is open, with a warning at startup |
 | `WEB_HOST` | server only, address the dashboard binds to |
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
+| `TLS_CERT`, `TLS_KEY` | server only, its certificate and key, relative to the config's folder. Empty for none |
+| `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
+
+### Certificates
+
+v1.2 encrypts the connections with TLS. The certificates come from a tool in
+the server folder:
+
+```
+py server/make_certs.py [--host NAME_OR_IP ...]
+```
+
+It writes four files into `server/data/certs/`:
+
+| File | Secret | Goes to |
+| --- | --- | --- |
+| `ca.key` | **yes** | stays on the server computer, nowhere else |
+| `ca.crt` | no | every client and every phone, trusted once |
+| `server.key` | **yes** | stays with the server |
+| `server.crt` | no | stays with the server |
+
+The server certificate names `localhost`, the computer's host name, its
+`.local` name and its LAN address; `--host` adds more. It is valid for 825
+days. Running the tool again keeps the authority and makes only a new server
+certificate, which is how it is renewed or fixed after the address changed:
+clients and phones need nothing new. `--new-ca` starts over, and then every
+client and phone needs the new `ca.crt`. The tool prints the exact config
+lines to set.
+
+`certs/` folders are ignored by git. `ca.key` is the key to the house: anyone
+who has it can make a certificate every client and phone will trust.
+
+The server and the clients start using these files in the next parts of v1.2.
 
 ### Ids
 
