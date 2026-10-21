@@ -15,8 +15,7 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 from shared import protocol  # noqa: E402
 from shared.protocol import read_message, send_message  # noqa: E402
-from handlers import client_handler  # noqa: E402
-from helpers import run_tests  # noqa: E402
+from handlers import client_handler, store  # noqa: E402
 
 NEEDS_TOKEN = "this server needs a token, set TOKEN in the client's config"
 
@@ -80,6 +79,7 @@ async def talk(port, hello):
 def run_server(tmp, scenario, **values):
     use_server_config(tmp, **values)
     client_handler.connected_clients.clear()
+    store.open_store(os.path.join(tmp, "pyhome.db"))
 
     async def main():
         server = await asyncio.start_server(client_handler.handle_client_async, "127.0.0.1", 0)
@@ -88,20 +88,24 @@ def run_server(tmp, scenario, **values):
         finally:
             server.close()
 
-    with contextlib.redirect_stdout(io.StringIO()) as out:
-        result = asyncio.run(main())
-    return result, out.getvalue()
+    try:
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            result = asyncio.run(main())
+    finally:
+        known = [c["id"] for c in store.list_clients()]
+        store.close_store()
+    return result, out.getvalue(), known
 
 
 def test_refused_client_is_not_registered(tmp):
     async def scenario(port):
         return await talk(port, {"id": "bad", "name": "Bad", "token": "guess"})
 
-    (answer, after), out = run_server(tmp, scenario, TOKEN="s3cret")
+    (answer, after), out, known = run_server(tmp, scenario, TOKEN="s3cret")
     assert answer == {"type": "denied", "reason": "wrong token"}, answer
     assert after is None, "the server must close after denied"
     assert client_handler.connected_clients == {}
-    assert not os.path.exists(os.path.join(tmp, "clients.json")), "a refused client must not be saved"
+    assert known == [], "a refused client must not be saved"
     assert "Refused" in out and "wrong token" in out, out
     assert "guess" not in out and "s3cret" not in out, "the token must never be printed"
 
@@ -112,7 +116,7 @@ def test_refused_client_name_is_sanitized(tmp):
     async def scenario(port):
         return await talk(port, {"id": "bad", "name": evil_name, "token": "guess"})
 
-    (answer, after), out = run_server(tmp, scenario, TOKEN="s3cret")
+    (answer, after), out, _ = run_server(tmp, scenario, TOKEN="s3cret")
     assert answer == {"type": "denied", "reason": "wrong token"}, answer
     assert "\x1b[31m" not in out, "an escape sequence from the peer must not reach the terminal"
     assert "x" * 100 not in out, "an oversized name must be truncated"
@@ -123,13 +127,8 @@ def test_accepted_client_gets_welcome(tmp):
         answer, _ = await talk(port, {"id": "good", "name": "Good", "token": "s3cret"})
         return answer
 
-    answer, out = run_server(tmp, scenario, TOKEN="s3cret")
+    answer, out, known = run_server(tmp, scenario, TOKEN="s3cret")
     assert answer["type"] == "welcome", answer
     assert "token" not in answer, "welcome must not echo the token"
-    with open(os.path.join(tmp, "clients.json"), encoding="utf-8") as f:
-        assert [c["ID"] for c in json.load(f)] == ["good"]
+    assert known == ["good"], known
     assert "s3cret" not in out
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

@@ -11,7 +11,6 @@ sys.path.insert(0, TESTS_DIR)
 sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 import make_certs  # noqa: E402
 
 TOKEN = "s3cret-https"
@@ -75,7 +74,3 @@ def test_dashboard_without_tls_stays_http(tmp):
         assert "/ca.crt" not in system.log("server")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

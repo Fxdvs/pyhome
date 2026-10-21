@@ -1,5 +1,5 @@
 from shared.config import load_config
-from handlers.connection_handler import connection
+from client_handlers.connection_handler import connection
 
 command = ["reconnect", "rc"]
 description = "Reconnect to server, re-reading the config first"

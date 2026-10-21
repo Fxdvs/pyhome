@@ -1,5 +1,7 @@
 # pyhome
 
+[![tests](https://github.com/Fxdvs/pyhome/actions/workflows/tests.yml/badge.svg)](https://github.com/Fxdvs/pyhome/actions/workflows/tests.yml)
+
 A small smart home system written in Python: one server, many clients, and a web
 dashboard. The server accepts client connections over TCP, keeps track of who is
 online, and serves a dashboard. Clients and the server exchange messages in both
@@ -8,6 +10,64 @@ directions.
 Both sides run as a console application with their own command prompt.
 
 **Status:** server and client `1.2`, see [Known limitations](#known-limitations).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph house["Home network"]
+        light["Client<br/>kuchyna-svetlo<br/><i>light</i>"]
+        thermo["Client<br/>obyvacka-termostat<br/><i>thermostat</i>"]
+        phone["Phone or browser"]
+    end
+
+    subgraph server["Server: one asyncio event loop"]
+        tcp["Client listener :50000<br/>asyncio streams"]
+        web["Dashboard :50001<br/>FastAPI + uvicorn"]
+        console["Console<br/>do · state · send · list"]
+        registry["Online clients<br/>pending requests"]
+        store[("pyhome.db<br/>SQLite")]
+    end
+
+    light -- "TLS · newline JSON<br/>hello, cmd, result, state" --> tcp
+    thermo -- "TLS" --> tcp
+    phone -- "HTTPS · Bearer token" --> web
+    tcp --- registry
+    web -- "send_command" --> registry
+    console -- "send_command" --> registry
+    tcp -- "clients" --> store
+```
+
+The server is one process and one asyncio event loop. The client listener, the
+FastAPI dashboard and the console prompt all run in it through
+`asyncio.gather`, so a browser action awaits the very same `send_command`
+the console's `do` uses, with no threads and no queues between them. Each
+client is its own process, on the server's computer or anywhere in the house,
+and needs nothing beyond the standard library.
+
+What happens when the dashboard switches a light:
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant W as Dashboard (FastAPI)
+    participant S as Server (asyncio)
+    participant C as Client kuchyna-svetlo
+
+    B->>W: POST /api/clients/kuchyna-svetlo/do<br/>{"action": "turn_on"} + Bearer token
+    W->>W: check token, body, capabilities
+    W->>S: await send_command(...)
+    S->>C: cmd {action, params, request_id}
+    C->>C: device runs turn_on
+    C-->>S: result {request_id, ok, state}
+    S-->>W: the result, matched by request_id
+    W-->>B: 200 {"ok": true, "state": {"on": true}}
+    Note over B: the card updates at once
+```
+
+Several commands can be in flight at once: each `cmd` carries a
+`request_id`, and the server completes the waiting request whose id the
+`result` names.
 
 ## Requirements
 
@@ -93,10 +153,12 @@ pyhome/
 │   ├── make_certs.py             makes the TLS authority and server certificate
 │   ├── data/
 │   │   ├── config.json           server identity and network settings
-│   │   └── clients.json          every client seen so far, created at runtime
+│   │   ├── certs/                TLS files from make_certs.py, not in git
+│   │   └── pyhome.db             the server's database, created at runtime, not in git
 │   ├── web/index.html            dashboard page, renders itself from /api/clients
 │   └── handlers/
 │       ├── server_handler.py     opens the TCP listener
+│       ├── store.py              the SQLite database, the only module that speaks SQL
 │       ├── client_handler.py     one coroutine per connected client
 │       ├── web_handler.py        FastAPI dashboard
 │       └── commands/             server only commands
@@ -104,12 +166,13 @@ pyhome/
 │   ├── app.py                    entry point
 │   ├── devices/                  one package per kind of device (light, thermostat)
 │   ├── data/config.json          client identity and which server to reach
-│   └── handlers/
+│   └── client_handlers/          named apart from the server's handlers, so pytest can import both
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
 │       ├── device_handler.py     loads the device and runs its actions
 │       └── commands/             client only commands
-├── tests/                        plain scripts, run all with py tests/run_all.py
+├── tests/                        pytest, run all with py -m pytest
+├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
 └── launcher.pyw                  GUI that starts and stops the server and clients
 ```
 
@@ -136,6 +199,28 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
+
+### Data folder
+
+Everything the server writes lives in the folder of the config it was started
+with, `server/data/` by default:
+
+| File | What |
+| --- | --- |
+| `config.json` | the server's settings |
+| `certs/` | the TLS files from `make_certs.py` |
+| `pyhome.db` | the database: every client seen so far, with its device and capabilities. Created at the first start |
+
+That one folder is all a backup or a Docker volume needs. `pyhome.db` is a
+SQLite file any SQLite browser opens (for example
+[DB Browser for SQLite](https://sqlitebrowser.org)). Copy it only while the
+server is stopped: while it runs, part of the data is in `pyhome.db-wal` next
+to it.
+
+A server upgraded from 1.2 or older imports its `clients.json` into the
+database at the first start and renames it to `clients.json.imported`, which
+stays as the backup. A database from a newer version than the server stops it
+with a message rather than being guessed at.
 
 ### Certificates
 
@@ -427,16 +512,29 @@ A connection goes:
 `type` is the envelope field, so a payload field never uses that name. The
 config's `TYPE` travels as `role`.
 
-The server stores every client it has seen in `clients.json` next to its
-config file. Device state is kept in memory only.
+The server stores every client it has seen in `pyhome.db`, see
+[Data folder](#data-folder).
 
 ## Tests
 
-Plain scripts with asserts, no framework needed:
+The tests use [pytest](https://pytest.org):
 
 ```
-py tests/run_all.py
+py -m pip install -r requirements.txt -r requirements-dev.txt
+py -m pytest                       everything
+py -m pytest -m "not e2e"          the quick ones, about 10 s
+py -m pytest tests/test_store.py   one file
+py -m pytest -k token              by name
 ```
+
+Files named `*_e2e.py` start a real server and real clients as processes, on
+free ports and from temp configs, so they never touch `server/data/`. They
+are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
+
+GitHub Actions runs the whole suite on every push and pull request, on
+Ubuntu and Windows with Python 3.10 and 3.13
+([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher's
+tests are skipped on a Python without `tkinter`.
 
 ## Known limitations
 
@@ -479,18 +577,19 @@ code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
+| 1.3 | Remembers what it knows ([spec](docs/v1.3-spec.md)) | A SQLite store, `clients.json` imported once, the last device state across restarts, a 90 day history of every change, offline devices on the dashboard |
 | 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+| 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
 Everything that is possible but not planned yet:
 
 | Idea | Why it is not done yet | Version |
 | --- | --- | --- |
-| Persisting device state | Losing it on restart is acceptable for now, the client can be asked again | 1.3 |
-| `clients.json` as a dict keyed by id | Changing it means migrating existing files | 1.3 |
-| Devices from several folders | Nothing needs it yet | 1.3 |
+| Devices from several folders | Nothing needs it yet | later |
 | Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
 | Choosing between several servers | One server is enough so far | 1.4 |
 | Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
 | Automations, rules and schedules | Not specified yet | later |
+| History charts on the dashboard | The history is recorded from 1.3, drawing it is its own piece of work | later |
+| A cloud copy for remote viewing | The house must work offline, a copy could only ever be an add-on | later |
 | More device types (sensor, switch, blinds) | Light and thermostat cover the contract for now | later |

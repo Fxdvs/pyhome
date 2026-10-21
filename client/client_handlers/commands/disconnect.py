@@ -1,4 +1,4 @@
-from handlers.connection_handler import connection
+from client_handlers.connection_handler import connection
 
 command = ["disconnect", "dc"]
 description = "Disconnect from server"

@@ -15,7 +15,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import System, wait_for, with_system  # noqa: E402,F401
-from helpers import run_tests  # noqa: E402
 
 
 def test_done_when(tmp):
@@ -57,8 +56,8 @@ def test_done_when(tmp):
         with urllib.request.urlopen(f"http://127.0.0.1:{system.web_port}/", timeout=5) as r:
             assert "Pripojené zariadenia" in r.read().decode("utf-8")
 
-        # the clients files follow the temp config, the real one is untouched
-        assert os.path.exists(os.path.join(system.tmp, "clients.json"))
+        # the database follows the temp config, the real one is untouched
+        assert system.known_ids() == ["e2e-light", "e2e-thermo"], system.known_ids()
 
     with_system(tmp, scenario)
 
@@ -86,7 +85,3 @@ def test_handshake_and_unknown_type(tmp):
             assert raw is not None and raw["device"] is None and raw["capabilities"] == [], raw
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

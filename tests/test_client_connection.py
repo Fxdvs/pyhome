@@ -14,9 +14,8 @@ sys.path.insert(0, ROOT_DIR)
 
 from shared import config  # noqa: E402
 from shared.protocol import read_message, send_message  # noqa: E402
-from handlers import connection_handler, message_handler  # noqa: E402
-from handlers.commands import reconnect  # noqa: E402
-from helpers import run_tests  # noqa: E402
+from client_handlers import connection_handler, message_handler  # noqa: E402
+from client_handlers.commands import reconnect  # noqa: E402
 
 WELCOME = {"type": "welcome", "id": "s", "name": "Server", "role": "server",
            "version": "test", "host": "127.0.0.1", "port": 1}
@@ -286,7 +285,3 @@ def test_server_restart_is_noticed_once_and_reconnects(tmp):
     hellos, out = quietly(scenario())
     assert len(hellos) == 1, "the second server should get exactly one hello"
     assert out.count("Connection closed by server") == 1, out
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

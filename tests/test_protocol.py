@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(TESTS_DIR))
 
 from shared import protocol  # noqa: E402
 from shared.protocol import ProtocolError, read_message, send_message  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 
 class FakeWriter:
@@ -98,7 +97,3 @@ def test_message_without_type_is_rejected(tmp):
     except ProtocolError:
         return
     raise AssertionError("expected ProtocolError")
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

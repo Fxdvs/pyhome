@@ -1,5 +1,4 @@
 """End to end: the token with a real server and real clients, v1.0 Part 3 and v1.1 Part 1."""
-import json
 import os
 import sys
 import urllib.request
@@ -8,7 +7,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 TOKEN = "s3cret-e2e"
 WRONG = "wrong-guess-123"
@@ -33,8 +31,7 @@ def test_token_protects_the_server(tmp):
         assert "No TOKEN set" not in server_log
 
         # refused clients are not saved, and the token is never printed anywhere
-        with open(os.path.join(system.tmp, "clients.json"), encoding="utf-8") as f:
-            assert [c["ID"] for c in json.load(f)] == ["e2e-good"]
+        assert system.known_ids() == ["e2e-good"], system.known_ids()
         for name in ("server", "e2e-good", "e2e-bad", "e2e-none"):
             log = system.log(name)
             assert TOKEN not in log and WRONG not in log, name
@@ -80,7 +77,3 @@ def test_no_token_accepts_everyone_with_a_warning(tmp):
         assert "anyone who can reach the dashboard" in system.log("server"), system.log("server")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

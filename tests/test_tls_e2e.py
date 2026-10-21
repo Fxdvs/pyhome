@@ -10,7 +10,6 @@ sys.path.insert(0, TESTS_DIR)
 sys.path.insert(0, os.path.join(ROOT_DIR, "server"))
 
 from e2e import free_port, wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 import make_certs  # noqa: E402
 
 TOKEN = "s3cret-on-the-wire"
@@ -138,7 +137,3 @@ def test_server_with_a_missing_certificate_does_not_start(tmp):
         assert "TLS file not found" in system.log("server"), system.log("server")
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

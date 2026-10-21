@@ -17,7 +17,6 @@ sys.path.insert(0, ROOT_DIR)
 from cryptography import x509  # noqa: E402
 from cryptography.x509.oid import ExtendedKeyUsageOID  # noqa: E402
 import make_certs  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 FILES = ["ca.crt", "ca.key", "server.crt", "server.key"]
 
@@ -142,6 +141,16 @@ def test_config_value(tmp):
     assert make_certs.config_value(outside) == outside.replace("\\", "/")
 
 
+def test_config_value_on_another_drive(tmp, monkeypatch):
+    # what os.path.relpath does on windows for C:\\... against a project on D:\\...
+    def other_drive(path, start=None):
+        raise ValueError("path is on mount 'C:', start on mount 'D:'")
+
+    monkeypatch.setattr(make_certs.os.path, "relpath", other_drive)
+    path = os.path.join(tmp, "server.crt")
+    assert make_certs.config_value(path) == path.replace("\\", "/")
+
+
 def test_main_prints_the_steps(tmp):
     out = run_main("--dir", tmp, "--host", "dom.lan", "--host", "Dóm PC")
     assert f"Certificates written to {tmp}" in out
@@ -211,7 +220,3 @@ def test_certs_are_ignored_by_git(tmp):
     except FileNotFoundError:
         return  # no git on this machine, nothing to check
     assert result.stdout.split() == paths, result.stdout
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

@@ -15,11 +15,11 @@ config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 from shared.config import get_config, id_warning  # noqa: E402
 from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
 from shared.symbols import WARNING  # noqa: E402
-from handlers.device_handler import get_capabilities, load_device  # noqa: E402
+from client_handlers.device_handler import get_capabilities, load_device  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
-from handlers.connection_handler import connect_to_server_async, tls_warning  # noqa: E402
-from handlers.message_handler import receive_messages_async  # noqa: E402
+from client_handlers.connection_handler import connect_to_server_async, tls_warning  # noqa: E402
+from client_handlers.message_handler import receive_messages_async  # noqa: E402
 
 NAME = get_config("NAME")
 ID = get_config("ID")
@@ -28,7 +28,7 @@ VERSION = get_config("VERSION")
 # commands are loaded from the shared folder first, then from our own
 COMMAND_SOURCES = [
     (os.path.join(ROOT_DIR, "shared", "commands"), "shared.commands"),
-    (os.path.join(APP_DIR, "handlers", "commands"), "handlers.commands"),
+    (os.path.join(APP_DIR, "client_handlers", "commands"), "client_handlers.commands"),
 ]
 
 # DEVICE names a folder in here

@@ -2,6 +2,13 @@
 
 # runtime state, the server writes this next to whatever config it was started with
 server/**/clients.json
+server/**/clients.json.imported
+
+# the server's database and its WAL files
+server/**/pyhome.db*
 
 # keys must never be committed, and a house's ca.crt is not the project's
 **/certs/
+
+# pytest
+.pytest_cache/

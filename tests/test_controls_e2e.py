@@ -6,7 +6,6 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TESTS_DIR)
 
 from e2e import wait_for, with_system  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 TOKEN = "s3cret-e2e"
 
@@ -61,7 +60,3 @@ def test_no_controls_without_a_server_token(tmp):
         assert system.client("e2e-light")["last_state"]["on"] is False, "nothing may have been switched"
 
     with_system(tmp, scenario)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

@@ -15,7 +15,6 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 from handlers import client_handler  # noqa: E402
 from handlers.devices import parse_params, parse_value  # noqa: E402
-from helpers import run_tests  # noqa: E402
 
 LAMP = ("127.0.0.1", 1001)
 HEATER = ("127.0.0.1", 1002)
@@ -287,15 +286,3 @@ def test_unhashable_request_id_does_not_raise(tmp):
         client_handler.handle_message(LAMP, "lamp", {
             "type": "result", "request_id": ["x"], "ok": True, "state": {}})
     assert client_handler.pending_requests == {}
-
-
-def test_clients_file_sits_next_to_the_config(tmp):
-    path = os.path.join(tmp, "server.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"ID": "s"}, f)
-    config.init(tmp, path)
-    assert client_handler.get_clients_file() == os.path.join(tmp, "clients.json")
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

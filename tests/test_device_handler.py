@@ -1,4 +1,4 @@
-"""client/handlers/device_handler.py and the devices in client/devices."""
+"""client/client_handlers/device_handler.py and the devices in client/devices."""
 import asyncio
 import contextlib
 import io
@@ -13,8 +13,7 @@ sys.path.insert(0, TESTS_DIR)
 sys.path.insert(0, CLIENT_DIR)
 sys.path.insert(0, ROOT_DIR)
 
-from handlers import device_handler  # noqa: E402
-from helpers import run_tests  # noqa: E402
+from client_handlers import device_handler  # noqa: E402
 
 
 def run(coroutine):
@@ -175,7 +174,3 @@ def test_sync_actions_work_too(tmp):
         assert reply == {"ok": True, "state": {"n": 3}}, reply
     finally:
         sys.path.remove(tmp)
-
-
-if __name__ == "__main__":
-    sys.exit(run_tests(globals()))

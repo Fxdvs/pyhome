@@ -3,8 +3,8 @@ import asyncio
 from shared.colors import GRAY, GREEN, RED, RESET
 from shared.console import print_message
 from shared.protocol import CMD, MESSAGE, RESULT, ProtocolError, read_message
-from handlers.connection_handler import connection, send_to_server
-from handlers.device_handler import execute
+from client_handlers.connection_handler import connection, send_to_server
+from client_handlers.device_handler import execute
 
 # how often the receive loop wakes up to notice a disconnect
 READ_TIMEOUT = 0.5
