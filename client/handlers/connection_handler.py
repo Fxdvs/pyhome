@@ -1,7 +1,8 @@
 import asyncio
+import ssl
 
 from shared.colors import GREEN, RED, RESET
-from shared.config import get_config, get_config_path
+from shared.config import get_config, get_config_file, get_config_path
 from shared.console import print_message
 from shared.protocol import DENIED, HELLO, STATE, WELCOME, ProtocolError, read_message, send_message
 from handlers.device_handler import GET_STATE, get_capabilities, get_device, run_action
@@ -12,6 +13,35 @@ HANDSHAKE_TIMEOUT = 10
 
 class AccessDenied(Exception):
     """The server refused our hello. Retrying with the same token cannot help."""
+
+
+class TLSRefused(Exception):
+    """TLS cannot work as configured. Retrying with the same TLS_CA cannot help."""
+
+
+def tls_context():
+    """The SSLContext trusting TLS_CA, or None when the client has none. TLSRefused when it cannot be built."""
+    ca = get_config_file("TLS_CA")
+    if ca is None:
+        return None
+    try:
+        context = ssl.create_default_context(cafile=ca)
+    except FileNotFoundError as e:
+        raise TLSRefused(f"TLS_CA file not found: {ca}") from e
+    except ssl.SSLError as e:
+        raise TLSRefused(f"TLS_CA is not a certificate: {ca}") from e
+    # the chain is still checked against this house's authority, which signs
+    # only this server; checking the host name as well would only break every
+    # client the day the server's address changes
+    context.check_hostname = False
+    return context
+
+
+def tls_warning():
+    """The startup warning for a client that talks in plain text, or None."""
+    if get_config("TLS_CA"):
+        return None
+    return "No TLS_CA set, the token and every message cross the network in plain text"
 
 
 class Connection:
@@ -28,12 +58,14 @@ class Connection:
         self.writer = None
         self.server_info = {}
         self.auto_reconnect = False
+        self.tls = False
         self.lock = asyncio.Lock()
 
-    def attach(self, reader, writer, server_info):
+    def attach(self, reader, writer, server_info, tls=False):
         self.reader = reader
         self.writer = writer
         self.server_info = server_info
+        self.tls = tls
         self.connected = True
         self.auto_reconnect = False
 
@@ -80,6 +112,13 @@ async def connect_to_server_async():
             print_message(f"{RED}Refused by the server{RESET}: {e}. "
                           f"Fix TOKEN in {get_config_path()}, then type 'reconnect'.")
 
+        except TLSRefused as e:
+            connection.connected = False
+            # the same TLS_CA would fail again, the same as a refused token
+            connection.auto_reconnect = False
+            print_message(f"{RED}TLS refused{RESET}: {e}. "
+                          f"Fix TLS_CA in {get_config_path()}, then type 'reconnect'.")
+
         except (OSError, ProtocolError, asyncio.TimeoutError) as e:
             connection.connected = False
             # keep trying, the server may simply not be up yet
@@ -97,7 +136,8 @@ async def connect_to_server_async():
 
 async def handshake():
     """Open a connection, say hello, and wait for the server to answer."""
-    reader, writer = await asyncio.open_connection(get_config("HOST"), get_config("PORT"))
+    context = tls_context()
+    reader, writer = await open_connection(context)
 
     # a numeric TOKEN in config.json is still a token, the server compares strings
     token = get_config("TOKEN")
@@ -118,7 +158,9 @@ async def handshake():
         welcome = await asyncio.wait_for(read_message(reader), timeout=HANDSHAKE_TIMEOUT)
 
         if welcome is None:
-            raise ConnectionError("server closed the connection during the handshake")
+            # a TLS server hangs up on a plain hello without a word
+            hint = "" if context else f". If it uses TLS, set TLS_CA in {get_config_path()}"
+            raise ConnectionError(f"server closed the connection during the handshake{hint}")
         if welcome["type"] == DENIED:
             raise AccessDenied(str(welcome.get("reason") or "no reason given"))
         if welcome["type"] != WELCOME:
@@ -128,8 +170,8 @@ async def handshake():
         writer.close()
         raise
 
-    connection.attach(reader, writer, welcome)
-    print_message(f"Connected to {GREEN}{connection.label}{RESET}")
+    connection.attach(reader, writer, welcome, tls=context is not None)
+    print_message(f"Connected to {GREEN}{connection.label}{RESET}" + (" (TLS)" if connection.tls else ""))
 
     # the server keeps the last known state, give it one to start from
     if get_device() is not None:
@@ -138,6 +180,29 @@ async def handshake():
             await send_message(writer, STATE, state=await run_action(GET_STATE, {}))
         except Exception as e:
             print_message(f"{RED}Could not send the device state{RESET}: {e}")
+
+
+async def open_connection(context):
+    """(reader, writer) to HOST:PORT, through TLS when context is given.
+
+    A certificate the authority did not sign raises TLSRefused. Any other TLS
+    failure becomes a ConnectionError that says what to check, and is retried:
+    the server may be restarting with its new config.
+    """
+    host, port = get_config("HOST"), get_config("PORT")
+    if context is None:
+        return await asyncio.open_connection(host, port)
+
+    try:
+        return await asyncio.open_connection(host, port, ssl=context, ssl_handshake_timeout=HANDSHAKE_TIMEOUT)
+    except ssl.SSLCertVerificationError as e:
+        # before OSError below: a rejected certificate is an OSError too
+        raise TLSRefused(f"server certificate not trusted by TLS_CA: {e.verify_message}") from e
+    except (ssl.SSLError, ConnectionResetError, ConnectionAbortedError, asyncio.TimeoutError) as e:
+        # a refused connection is not caught here, the server is simply not up
+        reason = str(e) or type(e).__name__
+        raise ConnectionError(f"TLS handshake failed: {reason}. "
+                              f"If the server does not use TLS, empty TLS_CA in {get_config_path()}") from e
 
 
 async def send_to_server(message_type, /, **payload):

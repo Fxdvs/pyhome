@@ -24,5 +24,6 @@ async def function():
         ("Host/Address:", get_config("HOST")),
         ("Port:", get_config("PORT")),
         ("Token:", "set" if get_config("TOKEN") else "not set"),
+        ("TLS:", "on" if connection.tls else ("set, not connected" if get_config("TLS_CA") else f"{RED}off{RESET}")),
         ("Connected:", status),
     ])

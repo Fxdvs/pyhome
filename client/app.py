@@ -18,7 +18,7 @@ from shared.symbols import WARNING  # noqa: E402
 from handlers.device_handler import get_capabilities, load_device  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import command_handler_async  # noqa: E402
-from handlers.connection_handler import connect_to_server_async  # noqa: E402
+from handlers.connection_handler import connect_to_server_async, tls_warning  # noqa: E402
 from handlers.message_handler import receive_messages_async  # noqa: E402
 
 NAME = get_config("NAME")
@@ -43,6 +43,11 @@ if os.name == "nt":
 async def main():
     # a warning, not a refusal: the id is also the key in the server's clients.json
     warning = id_warning(ID)
+    if warning:
+        print(f"{WARNING} {YELLOW}{warning}{RESET}")
+
+    # the same as the server: plain text should be visible, not silent
+    warning = tls_warning()
     if warning:
         print(f"{WARNING} {YELLOW}{warning}{RESET}")
 
