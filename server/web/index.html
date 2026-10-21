@@ -111,6 +111,9 @@
   .ok { font-size: 15px; font-weight: 560; color: #1d7a3a; }
   .warn { font-size: 15px; font-weight: 560; color: #b35c00; }
 
+  /* offline zariadenie: posledný známy stav, bez ovládania */
+  .card.offline { opacity: .6; filter: grayscale(.7); }
+
   /* ovládanie */
   button.switch { border: 0; cursor: pointer; }
   button.switch:disabled, .step:disabled, .chip.act:disabled { cursor: default; opacity: .55; }
@@ -229,11 +232,24 @@ const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 function head(c, right) {
   return `<div style="display:flex; align-items:flex-start; gap:16px; justify-content:space-between;">
     <div style="min-width:0;">
-      <div class="label">${esc(c.name || "klient")} · ${esc(c.host || "?")}:${esc(c.port ?? "?")}</div>
+      <div class="label">${esc(c.name || "klient")} · ${isOffline(c) ? "Offline, naposledy " + esc(lastSeen(c.last_seen)) : esc(c.host || "?") + ":" + esc(c.port ?? "?")}</div>
       <div class="name" style="margin-top:6px;">${esc(DEVICE_TITLES[c.device] || "Klient")}<span style="color:rgba(28,28,30,.35); font-weight:500; font-size:16px;"> #${esc(c.id || "?")}</span></div>
     </div>
     ${right || ""}
   </div>`;
+}
+
+// starší server a demo dáta pole online nemajú, vtedy je každý klient online
+const isOffline = (c) => c.online === false;
+
+// dnešný čas bez dátumu, inak aj deň a mesiac
+function lastSeen(iso) {
+  const at = new Date(iso);
+  if (!iso || Number.isNaN(at.getTime())) return "neznámo";
+  const time = at.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
+  return at.toDateString() === new Date().toDateString()
+    ? time
+    : at.toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" }) + " " + time;
 }
 
 const DEVICE_TITLES = { light: "Svetlá", thermostat: "Vykurovanie", lock: "Zámok" };
@@ -329,7 +345,8 @@ function capChips(c, buttons) {
 }
 
 function can(c, action) {
-  return controls && (c.capabilities || []).includes(action);
+  // offline zariadeniu nemá kto odpovedať, ovládanie by len čakalo na 404
+  return controls && !isOffline(c) && (c.capabilities || []).includes(action);
 }
 
 function errLine(c) {
@@ -346,15 +363,18 @@ function clientCard(c) {
 }
 
 function render(clients, demo) {
+  const online = clients.filter((c) => !isOffline(c)).length;
   document.getElementById("demoBadge").style.display = demo ? "" : "none";
-  document.getElementById("statusDot").className = "dot" + (clients.length ? "" : " off");
-  document.getElementById("statusText").textContent = clients.length
-    ? clients.length + (clients.length === 1 ? " klient online" : " klientov online")
+  document.getElementById("statusDot").className = "dot" + (online ? "" : " off");
+  document.getElementById("statusText").textContent = online
+    ? online + (online === 1 ? " klient online" : " klientov online")
     : "Žiadny pripojený klient";
   document.getElementById("updated").textContent = "Aktualizované " + new Date().toLocaleTimeString("sk-SK");
 
-  document.getElementById("countMetric").innerHTML =
-    clients.length + "<small> klientov online</small>";
+  // server si pamätá aj tých, čo nie sú pripojení
+  document.getElementById("countMetric").innerHTML = online === clients.length
+    ? online + "<small> klientov online</small>"
+    : online + "<small> online z " + clients.length + "</small>";
 
   const types = [...new Set(clients.map((c) => c.device).filter(Boolean))];
   document.getElementById("devicesSummary").textContent = types.length
@@ -399,6 +419,7 @@ function renderClients(clients) {
       tmp.innerHTML = html;
       const fresh = tmp.firstElementChild;
       fresh.dataset.id = id;
+      if (isOffline(c)) fresh.classList.add("offline");
       fresh._html = html;
       if (node) node.replaceWith(fresh); else grid.appendChild(fresh);
       node = fresh;

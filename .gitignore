@@ -4,8 +4,9 @@
 server/**/clients.json
 server/**/clients.json.imported
 
-# the server's database and its WAL files
+# the server's database, its WAL files and the copies data backup makes
 server/**/pyhome.db*
+server/**/pyhome-backup-*.db
 
 # keys must never be committed, and a house's ca.crt is not the project's
 **/certs/

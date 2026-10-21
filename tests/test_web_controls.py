@@ -203,7 +203,7 @@ def test_page_controls_only_when_the_server_allows(tmp):
     assert "controls = !!status.controls;" in page
     # demo data and a failed status read never get controls
     assert page.count("controls = false;") >= 1
-    assert "return controls && (c.capabilities || []).includes(action);" in page
+    assert "return controls && !isOffline(c) && (c.capabilities || []).includes(action);" in page
 
 
 def test_page_sends_the_slider_once_on_release(tmp):

@@ -141,6 +141,12 @@ class System:
         return body["clients"] if status == 200 else None
 
     def client(self, client_id):
+        """The client as the dashboard API shows it, only while it is online."""
+        found = self.known(client_id)
+        return found if found and found["online"] else None
+
+    def known(self, client_id):
+        """The client as the dashboard API shows it, online or offline."""
         for client in self.api() or []:
             if client["id"] == client_id:
                 return client

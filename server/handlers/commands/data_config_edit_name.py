@@ -3,6 +3,7 @@ import os
 from shared.colors import GRAY, RESET
 from shared.symbols import SUCCESS, ERROR, QUESTION
 from shared.config import get_config, set_config
+from shared.console import ask
 
 command = ["data config edit name","data conf edit name"]
 description = "Edits the server name"
@@ -15,7 +16,8 @@ async def function():
     name = get_config("NAME")
 
     print(f"{QUESTION} Are you sure you want to edit the server name? (y/n)")
-    accept = input(">").strip().lower()
+    # the server keeps answering clients and the dashboard while this waits
+    accept = (await ask(">")).strip().lower()
     if accept != "y":
         print(f"{ERROR} Operation cancelled.")
         return
@@ -24,7 +26,7 @@ async def function():
     print(margin + f"{GRAY}{'─' * gap}{RESET}")
     print(margin + f"{'From:'.ljust(gap-len(name))}{name}\n")
 
-    new_name = input("> ").strip()
+    new_name = (await ask("> ")).strip()
     if new_name != "":
         print("\n" + margin + "/data/config.json")
         print(margin + f"{GRAY}{'─' * gap}{RESET}")
@@ -32,7 +34,7 @@ async def function():
         print(margin + f"{'To:'.ljust(gap-len(new_name))}{new_name}\n")
 
         print(f"{QUESTION} Are you sure you want to edit the server name to '{new_name}'? (y/n)")
-        accept = input("> ").strip().lower()
+        accept = (await ask("> ")).strip().lower()
         if accept == "y":
             set_config("NAME", new_name)
             print(f"{SUCCESS} Name has been changed to '{new_name}'!")
