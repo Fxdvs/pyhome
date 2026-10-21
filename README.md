@@ -366,7 +366,7 @@ code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md) and
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.2 | Encrypted transport | TLS on the client connection, HTTPS for the dashboard, a guide to making certificates |
+| 1.2 | Encrypted transport ([spec](docs/v1.2-spec.md)) | TLS on the client connection, HTTPS for the dashboard, a guide to making certificates |
 | 1.3 | Remembers what it knows | Device state persisted across restarts, `clients.json` keyed by id with a migration, devices loaded from several folders |
 | 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
 
