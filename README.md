@@ -194,7 +194,8 @@ When the two sides disagree, the client says what to fix:
 | TLS | no `TLS_CA` | `... If it uses TLS, set TLS_CA in ...` | yes |
 | no TLS | `TLS_CA` set | `TLS handshake failed ... If the server does not use TLS, empty TLS_CA ...` | yes |
 
-The dashboard still speaks plain HTTP until the last part of v1.2.
+The same `TLS_CERT` and `TLS_KEY` also turn the dashboard into HTTPS, see
+[HTTPS and phones](#https-and-phones).
 
 ### Ids
 
@@ -309,6 +310,45 @@ The server runs FastAPI on port `50001`:
 | `GET /api/status` | `{"token_required": true, "controls": true}`, both `false` without a `TOKEN`. No token needed, the page reads it first |
 | `GET /api/clients` | the connected clients as JSON, which the page reads. Needs the token when the server has one |
 | `POST /api/clients/<id>/do` | runs a device action, body `{"action": "set_brightness", "params": {"level": 40}}`. Needs the token, and a server without one refuses it with 403 |
+| `GET /ca.crt` | the authority certificate for phones to install, no token needed. 404 without TLS |
+
+### HTTPS and phones
+
+With `TLS_CERT` and `TLS_KEY` set, the dashboard answers only `https://` on the
+same port, with the same certificate as the client connections. The server
+prints the addresses and the fingerprint of `ca.crt`:
+
+```
+Dashboard running on https://localhost:50001
+                     https://192.168.1.20:50001
+                     ca.crt at /ca.crt, SHA-256 64:B8:03:30:...
+```
+
+A browser trusts the dashboard once `ca.crt` is installed on that device.
+Until then it shows a full page warning. Accept it once, open the **Stiahni
+ca.crt** link on the login card (or `/ca.crt`), and install it:
+
+- **Android** (menu names vary by maker): Settings → Security → Encryption &
+  credentials → Install a certificate → CA certificate, pick `pyhome-ca.crt`
+- **iPhone:** open the downloaded profile in Settings → Profile Downloaded →
+  Install, then turn it on in Settings → General → About → Certificate Trust
+  Settings
+- **Windows:** double click `ca.crt` → Install Certificate → Local Machine →
+  Place all certificates in: Trusted Root Certification Authorities
+
+**Compare the fingerprint** the phone shows with the one the server printed
+before trusting it. That is what makes the first download safe: anyone in the
+middle could hand you their own `ca.crt`, but not one with the same
+fingerprint. Copying the file over a cable is just as good.
+
+The browser checks that the certificate names the address in the address bar.
+The certificate names `localhost`, the computer's name, its `.local` name and
+its LAN address at the time `make_certs.py` ran. If the address changes, run
+`py server/make_certs.py` again and restart the server: phones keep their
+trust, only the server certificate is new.
+
+`http://` and `https://` are different sites to a browser, so after switching
+to HTTPS the page asks for the token once more.
 
 When the server has a `TOKEN`, the page asks for it once and keeps it in the
 browser (`localStorage`), **Odhlásiť** forgets it. The API takes it in a header,
@@ -397,10 +437,15 @@ py tests/run_all.py
 
 ## Known limitations
 
-- **The dashboard is not encrypted yet.** With TLS set, the client
-  connections are, but the browser still talks plain HTTP, so the token typed
-  into the dashboard crosses the network in plain text. Without TLS set,
-  everything does.
+- **Without TLS nothing is encrypted.** The token and every message cross
+  the network in plain text until `TLS_CERT`, `TLS_KEY` and `TLS_CA` are set;
+  both sides warn about it at startup.
+- **The first trust is on you.** HTTPS means something only once `ca.crt` is
+  on the phone, and only if its fingerprint was compared, or it came over a
+  cable.
+- **`ca.key` is the key to the house.** Anyone who has it can make a
+  certificate every client and phone will trust. It stays on the server
+  computer, out of git and out of backups that leave the house.
 - **The browser keeps the token.** Anyone with the unlocked phone or computer
   has the dashboard, controls included, until **Odhlásiť** is pressed.
 - **One secret for everything.** Anyone with a client config has the token and
