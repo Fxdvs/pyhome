@@ -141,6 +141,16 @@ def test_config_value(tmp):
     assert make_certs.config_value(outside) == outside.replace("\\", "/")
 
 
+def test_config_value_on_another_drive(tmp, monkeypatch):
+    # what os.path.relpath does on windows for C:\\... against a project on D:\\...
+    def other_drive(path, start=None):
+        raise ValueError("path is on mount 'C:', start on mount 'D:'")
+
+    monkeypatch.setattr(make_certs.os.path, "relpath", other_drive)
+    path = os.path.join(tmp, "server.crt")
+    assert make_certs.config_value(path) == path.replace("\\", "/")
+
+
 def test_main_prints_the_steps(tmp):
     out = run_main("--dir", tmp, "--host", "dom.lan", "--host", "Dóm PC")
     assert f"Certificates written to {tmp}" in out

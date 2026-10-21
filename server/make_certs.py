@@ -190,7 +190,11 @@ def load_authority(certs_dir):
 
 def config_value(path):
     """path as it goes into server/data/config.json: relative to its folder when inside it."""
-    relative = os.path.relpath(path, DATA_DIR)
+    try:
+        relative = os.path.relpath(path, DATA_DIR)
+    except ValueError:
+        # windows: another drive than the project has no relative path to it
+        return path.replace("\\", "/")
     if relative.startswith(".."):
         return path.replace("\\", "/")
     return relative.replace("\\", "/")
