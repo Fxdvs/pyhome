@@ -26,7 +26,7 @@ flowchart LR
         web["Dashboard :50001<br/>FastAPI + uvicorn"]
         console["Console<br/>do · state · send · list"]
         registry["Online clients<br/>pending requests"]
-        store[("pyhome.db<br/>SQLite")]
+        store[("pyhome.db<br/>SQLite via SQLAlchemy")]
     end
 
     light -- "TLS · newline JSON<br/>hello, cmd, result, state" --> tcp
@@ -72,7 +72,7 @@ Several commands can be in flight at once: each `cmd` carries a
 ## Requirements
 
 - Python 3.10 or newer
-- `fastapi` and `uvicorn` for the server, `cryptography` for its certificate tool. The client needs nothing beyond the
+- `fastapi` and `uvicorn` for the server, `sqlalchemy` for its database, `cryptography` for its certificate tool. The client needs nothing beyond the
   standard library.
 
 ```
@@ -158,7 +158,7 @@ pyhome/
 │   ├── web/index.html            dashboard page, renders itself from /api/clients
 │   └── handlers/
 │       ├── server_handler.py     opens the TCP listener
-│       ├── store.py              the SQLite database, the only module that speaks SQL
+│       ├── store.py              the database: SQLAlchemy ORM over SQLite, the only module that knows SQL
 │       ├── client_handler.py     one coroutine per connected client
 │       ├── web_handler.py        FastAPI dashboard
 │       └── commands/             server only commands
@@ -212,7 +212,8 @@ with, `server/data/` by default:
 | `pyhome.db` | the database: every client seen so far, with its device and capabilities. Created at the first start |
 
 That one folder is all a backup or a Docker volume needs. `pyhome.db` is a
-SQLite file any SQLite browser opens (for example
+SQLite file, which the server reads and writes through SQLAlchemy 2.0 ORM
+classes in `server/handlers/store.py`. Any SQLite browser opens it (for example
 [DB Browser for SQLite](https://sqlitebrowser.org)). Copy it only while the
 server is stopped: while it runs, part of the data is in `pyhome.db-wal` next
 to it.

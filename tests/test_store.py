@@ -86,7 +86,8 @@ def test_a_file_that_is_not_sqlite_is_refused(tmp):
 
 def test_a_failed_migration_leaves_the_old_version(tmp):
     def broken(db):
-        db.execute("CREATE TABLE half (x)")
+        # a migration gets a SQLAlchemy connection, as _migration_1 does
+        db.exec_driver_sql("CREATE TABLE half (x)")
         raise sqlite3.OperationalError("disk on fire")
 
     original = list(store.MIGRATIONS)
@@ -104,6 +105,34 @@ def test_a_failed_migration_leaves_the_old_version(tmp):
     with raw(tmp) as db:
         assert db.execute("PRAGMA user_version").fetchone()[0] == 1
         assert db.execute("SELECT name FROM sqlite_master WHERE name = 'half'").fetchone() is None
+
+
+def test_orm_classes_match_the_migrated_schema(tmp):
+    """The ORM classes and the migrations must describe the same tables, or one of them is lying."""
+    import sqlalchemy
+
+    store.open_store(db_path(tmp))
+    store.close_store()
+    engine = sqlalchemy.create_engine(f"sqlite:///{db_path(tmp)}")
+    try:
+        inspector = sqlalchemy.inspect(engine)
+        for table in store.Base.metadata.sorted_tables:
+            real = {c["name"]: c for c in inspector.get_columns(table.name)}
+            assert set(real) == set(table.columns.keys()), table.name
+            for column in table.columns:
+                assert real[column.name]["nullable"] == column.nullable or column.primary_key, (table.name, column.name)
+                assert bool(real[column.name]["primary_key"]) == column.primary_key, (table.name, column.name)
+            # SQLAlchemy's SQLite reflection leaves out ON DELETE, the pragma has it
+            with raw(tmp) as db:
+                real_fks = {(row[2], (row[3],), None if row[6] == "NO ACTION" else row[6])
+                            for row in db.execute(f"PRAGMA foreign_key_list({table.name})")}
+            orm_fks = {(fk.column.table.name, (fk.parent.name,), fk.ondelete) for fk in table.foreign_keys}
+            assert real_fks == orm_fks, (table.name, real_fks, orm_fks)
+            real_indexes = {(i["name"], tuple(i["column_names"])) for i in inspector.get_indexes(table.name)}
+            orm_indexes = {(i.name, tuple(c.name for c in i.columns)) for i in table.indexes}
+            assert real_indexes == orm_indexes, (table.name, real_indexes, orm_indexes)
+    finally:
+        engine.dispose()
 
 
 def test_upsert_keeps_first_seen(tmp):

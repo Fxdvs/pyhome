@@ -2,5 +2,7 @@
 # Install with: py -m pip install -r requirements.txt
 fastapi>=0.141
 uvicorn>=0.53
+# server/handlers/store.py, the ORM over SQLite
+sqlalchemy>=2.0
 # server/make_certs.py, not_valid_after_utc needs 42
 cryptography>=42
