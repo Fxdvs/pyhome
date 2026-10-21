@@ -166,7 +166,35 @@ lines to set.
 `certs/` folders are ignored by git. `ca.key` is the key to the house: anyone
 who has it can make a certificate every client and phone will trust.
 
-The server and the clients start using these files in the next parts of v1.2.
+### Encrypting the client connections
+
+1. `py server/make_certs.py`
+2. In `server/data/config.json`: `"TLS_CERT": "certs/server.crt", "TLS_KEY": "certs/server.key"`
+3. Copy `server/data/certs/ca.crt` into each client's `data/certs/` folder and
+   set `"TLS_CA": "certs/ca.crt"` in its config
+4. Restart the server and the clients
+
+Both sides print `TLS on` at startup and the client says `Connected to ... (TLS)`.
+Without these keys everything works as before, with a warning on each side
+that the token crosses the network in plain text. A server whose `TLS_CERT`
+or `TLS_KEY` cannot be loaded does not start at all: running unencrypted
+because of a typo would look like it works. A certificate within 30 days of
+its end is announced at every start.
+
+Clients check that the server's certificate was signed by `ca.crt`, but not
+which address it names, so they keep working after the server's address
+changes. The browser does check the address, see the dashboard.
+
+When the two sides disagree, the client says what to fix:
+
+| Server | Client | The client prints | Retries |
+| --- | --- | --- | --- |
+| TLS | trusts another `ca.crt` | `TLS refused: server certificate not trusted by TLS_CA ...` | no, fix `TLS_CA`, then `reconnect` |
+| TLS | `TLS_CA` file missing or not a certificate | `TLS refused: TLS_CA file not found ...` | no, fix `TLS_CA`, then `reconnect` |
+| TLS | no `TLS_CA` | `... If it uses TLS, set TLS_CA in ...` | yes |
+| no TLS | `TLS_CA` set | `TLS handshake failed ... If the server does not use TLS, empty TLS_CA ...` | yes |
+
+The dashboard still speaks plain HTTP until the last part of v1.2.
 
 ### Ids
 
@@ -369,10 +397,10 @@ py tests/run_all.py
 
 ## Known limitations
 
-- **The token is not encryption.** It travels in plain text over a plain TCP
-  socket and over plain HTTP from the browser. It keeps a neighbour or a stray
-  device on the same network out, it does not stop anyone who can watch the
-  traffic.
+- **The dashboard is not encrypted yet.** With TLS set, the client
+  connections are, but the browser still talks plain HTTP, so the token typed
+  into the dashboard crosses the network in plain text. Without TLS set,
+  everything does.
 - **The browser keeps the token.** Anyone with the unlocked phone or computer
   has the dashboard, controls included, until **Odhlásiť** is pressed.
 - **One secret for everything.** Anyone with a client config has the token and
