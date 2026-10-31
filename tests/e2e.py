@@ -31,6 +31,12 @@ def free_port():
         return s.getsockname()[1]
 
 
+def free_udp_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def wait_for(check, what):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
@@ -56,6 +62,8 @@ class System:
         self.tmp = tmp
         self.port = free_port()
         self.web_port = free_port()
+        # never 50002: a real server on this machine may answer there
+        self.discovery_port = free_udp_port()
         self.processes = []
         self.logs = {}
         self.server = None
@@ -93,16 +101,17 @@ class System:
             "ID": "e2e-server", "NAME": "E2E server", "TYPE": "server", "VERSION": "test",
             "HOST": "127.0.0.1", "PORT": self.port,
             "WEB_HOST": "127.0.0.1", "WEB_PORT": self.web_port,
+            "DISCOVERY_PORT": self.discovery_port,
             **extra,
         }, stdin=subprocess.PIPE)
         wait_for(lambda: self.api() is not None, "the dashboard to answer")
 
-    def start_client(self, client_id, device=None, **extra):
-        self.start(client_id, CLIENT_DIR, {
+    def start_client(self, client_id, device=None, stdin=subprocess.DEVNULL, **extra):
+        return self.start(client_id, CLIENT_DIR, {
             "ID": client_id, "NAME": client_id.title(), "TYPE": "client", "VERSION": "test",
             "HOST": "127.0.0.1", "PORT": self.port, "DEVICE": device,
             **extra,
-        })
+        }, stdin=stdin)
 
     def url(self, path):
         return f"{self.scheme}://127.0.0.1:{self.web_port}{path}"

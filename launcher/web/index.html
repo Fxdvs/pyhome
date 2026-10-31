@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pyhome</title>
+  <link rel="stylesheet" href="launcher.css">
+</head>
+<body class="h-screen overflow-hidden bg-wall font-ui text-[13.5px] text-fg antialiased">
+  <!-- the wallpaper the glass blurs -->
+  <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+    <i class="absolute -left-[8vw] -top-[10vw] size-[46vw] rounded-full bg-blob-1 opacity-55 blur-[90px]"></i>
+    <i class="absolute -right-[10vw] top-[10vh] size-[40vw] rounded-full bg-blob-2 opacity-40 blur-[90px]"></i>
+    <i class="absolute -bottom-[18vw] left-[30vw] size-[38vw] rounded-full bg-blob-3 opacity-35 blur-[90px]"></i>
+  </div>
+
+  <div class="glass relative flex h-full flex-col bg-glass">
+    <header class="flex flex-wrap items-center gap-3 border-b border-edge-soft px-4 py-2.5">
+      <span class="font-semibold tracking-tight text-muted">pyhome</span>
+      <span id="serverChip" class="rounded-full border border-edge-soft bg-hi px-2.5 py-0.5 text-[11px] text-muted"></span>
+      <span class="flex-1"></span>
+      <button class="btn" id="serverSettings" type="button">Nastavenia servera</button>
+      <button class="btn" id="stopAll" type="button">Zastaviť všetko</button>
+      <button class="btn btn-primary" id="runChecked" type="button">Spustiť označené</button>
+    </header>
+
+    <div class="relative grid min-h-0 flex-1 grid-cols-[268px_minmax(0,1fr)]">
+      <nav class="flex min-h-0 flex-col gap-0.5 overflow-y-auto border-r border-edge-soft bg-white/[0.025] px-2.5 py-3" aria-label="Aplikácie">
+        <div id="apps" class="flex flex-col gap-0.5"></div>
+        <button id="newClient" type="button" class="mt-auto rounded-lg border border-dashed border-edge px-2.5 py-2 text-left text-muted hover:border-accent/60 hover:text-accent-fg">+ Nový klient</button>
+      </nav>
+
+      <section class="flex min-h-0 min-w-0 flex-col">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-edge-soft px-[18px] py-3.5">
+          <h1 id="title" class="m-0 text-[19px] font-bold tracking-tight"></h1>
+          <span id="meta" class="font-mono text-xs text-muted"></span>
+          <span class="flex-1"></span>
+          <div id="chips" class="flex flex-wrap gap-1.5"></div>
+          <button class="btn" id="edit" type="button">Upraviť</button>
+          <button class="btn" id="toggle" type="button"></button>
+        </div>
+        <div id="console" class="min-h-0 flex-1 overflow-auto bg-console px-[18px] py-3.5 font-mono text-[12.3px] leading-[1.7] text-white/85" aria-live="polite"></div>
+        <form id="prompt" class="flex items-center gap-2 border-t border-edge-soft px-3.5 py-2.5">
+          <span class="font-mono text-accent-fg">&gt;</span>
+          <input id="command" class="field-input font-mono text-[12.3px]" autocomplete="off" spellcheck="false" placeholder="príkaz, napríklad do kuch turn_on alebo help">
+          <button class="btn" type="submit">Odoslať</button>
+        </form>
+      </section>
+
+      <!-- a new or edited client -->
+      <aside id="clientSheet" hidden class="glass absolute inset-y-0 right-0 flex w-[min(400px,100%)] flex-col gap-3.5 overflow-auto border-l border-edge bg-glass-strong p-[18px] shadow-[-20px_0_50px_rgb(0_0_0/0.4)]" aria-labelledby="clientTitle">
+        <h2 id="clientTitle" class="m-0 text-[17px] font-semibold tracking-tight">Nový klient</h2>
+        <p id="clientFile" class="m-0 text-[12.5px] leading-normal text-muted"></p>
+        <form id="clientForm" class="flex flex-col gap-3.5" novalidate>
+          <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Názov</span>
+            <input class="field-input" name="name" placeholder="Spálňa svetlo" autocomplete="off">
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="name"></small></label>
+          <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">ID</span>
+            <input class="field-input font-mono text-[12.3px]" name="id" placeholder="spalna-svetlo" autocomplete="off" spellcheck="false">
+            <small class="text-[11.5px] text-faint">miestnosť-zariadenie, malé písmená bez diakritiky</small>
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="id"></small></label>
+          <div class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Zariadenie</span>
+            <div id="devices" class="flex rounded-[9px] border border-edge-soft bg-black/30 p-0.5" role="radiogroup" aria-label="Zariadenie"></div>
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="device"></small></div>
+          <div class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Server</span>
+            <div class="flex gap-1.5">
+              <input class="field-input flex-1" name="host" placeholder="adresa, napríklad 192.168.1.20" aria-label="Adresa servera" autocomplete="off">
+              <input class="field-input w-24" name="port" inputmode="numeric" aria-label="Port servera" autocomplete="off">
+            </div>
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="host"></small>
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="port"></small>
+            <div class="flex items-center gap-2"><button class="btn" type="button" id="findServers">Hľadať servery</button>
+              <small id="findState" class="text-[11.5px] text-faint" aria-live="polite"></small></div>
+            <div id="servers" class="grid gap-1.5 empty:hidden"></div></div>
+          <label class="flex items-start gap-2"><input type="checkbox" name="use_server_token" class="mt-0.5 accent-accent">
+            <span>Použiť token servera z tohto počítača <small id="tokenHint" class="block text-[11.5px] text-faint"></small></span></label>
+          <label id="tokenField" class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Token</span>
+            <input class="field-input font-mono text-[12.3px]" name="token" autocomplete="off" spellcheck="false" placeholder="prázdny, ak ho server nemá"></label>
+          <label class="flex items-start gap-2"><input type="checkbox" name="tls" class="mt-0.5 accent-accent">
+            <span>Skopírovať <code class="font-mono text-[11.5px]">ca.crt</code> a zapnúť TLS <small id="tlsHint" class="block text-[11.5px] text-faint"></small></span></label>
+          <small class="text-[11.5px] text-bad empty:hidden" data-error="tls"></small>
+          <div class="mt-1 flex justify-end gap-2">
+            <button class="btn" type="button" data-close>Zrušiť</button>
+            <button class="btn btn-primary" type="submit" id="clientSave">Uložiť</button>
+          </div>
+        </form>
+      </aside>
+
+      <!-- the server's settings -->
+      <aside id="serverSheet" hidden class="glass absolute inset-y-0 right-0 flex w-[min(400px,100%)] flex-col gap-3.5 overflow-auto border-l border-edge bg-glass-strong p-[18px] shadow-[-20px_0_50px_rgb(0_0_0/0.4)]" aria-labelledby="serverTitle">
+        <h2 id="serverTitle" class="m-0 text-[17px] font-semibold tracking-tight">Nastavenia servera</h2>
+        <p class="m-0 text-[12.5px] leading-normal text-muted">Ukladá sa do <code class="font-mono text-[11.5px] text-fg">server/data/config.json</code>. Ostatné kľúče zostanú, ako sú.</p>
+        <form id="serverForm" class="flex flex-col gap-3.5" novalidate>
+          <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Názov</span>
+            <input class="field-input" name="name" autocomplete="off">
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="name"></small></label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Port pre klientov</span>
+              <input class="field-input" name="port" inputmode="numeric" autocomplete="off">
+              <small class="text-[11.5px] text-bad empty:hidden" data-error="port"></small></label>
+            <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Port dashboardu</span>
+              <input class="field-input" name="web_port" inputmode="numeric" autocomplete="off">
+              <small class="text-[11.5px] text-bad empty:hidden" data-error="web_port"></small></label>
+          </div>
+          <div class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Token</span>
+            <div class="flex gap-1.5">
+              <input class="field-input flex-1 font-mono text-[12.3px]" name="token" aria-label="Token" autocomplete="off" spellcheck="false" placeholder="bez tokenu sa pripojí ktokoľvek">
+              <button class="btn" type="button" id="generateToken">Vygenerovať</button>
+            </div>
+            <small class="text-[11.5px] text-faint">Klienti s rovnakým tokenom sa pripoja, ostatných server odmietne.</small></div>
+          <label class="grid gap-1.5"><span class="text-xs font-semibold text-muted">Koľko dní držať históriu</span>
+            <input class="field-input w-24" name="history_days" inputmode="numeric" autocomplete="off">
+            <small class="text-[11.5px] text-bad empty:hidden" data-error="history_days"></small></label>
+          <div class="flex justify-end gap-2">
+            <button class="btn" type="button" data-close>Zrušiť</button>
+            <button class="btn btn-primary" type="submit">Uložiť</button>
+          </div>
+        </form>
+        <div class="grid gap-2 border-t border-edge-soft pt-3.5">
+          <span class="text-xs font-semibold text-muted">TLS</span>
+          <p id="tlsState" class="m-0 text-[12.5px] text-muted"></p>
+          <input class="field-input" id="certHosts" autocomplete="off" spellcheck="false" placeholder="ďalšie adresy, napríklad dom.lan (nepovinné)" aria-label="Ďalšie adresy pre certifikát">
+          <div><button class="btn" type="button" id="makeCerts">Vytvoriť certifikáty</button></div>
+          <pre id="certOutput" hidden class="m-0 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-console p-2.5 font-mono text-[11.5px] text-white/80"></pre>
+        </div>
+      </aside>
+    </div>
+
+    <!-- a question that needs an answer: closing with apps running, restarting after an edit -->
+    <div id="dialog" hidden class="absolute inset-0 grid place-items-center bg-black/40 p-4">
+      <div class="glass grid w-[min(380px,100%)] gap-4 rounded-2xl border border-edge bg-glass-strong p-5 shadow-[0_30px_80px_rgb(0_0_0/0.55)]" role="alertdialog" aria-modal="true" aria-labelledby="dialogText">
+        <p id="dialogText" class="m-0 leading-normal"></p>
+        <div class="flex justify-end gap-2">
+          <button class="btn" type="button" id="dialogNo">Zrušiť</button>
+          <button class="btn btn-primary" type="button" id="dialogYes"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

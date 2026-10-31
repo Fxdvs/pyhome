@@ -16,17 +16,18 @@ config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
 from shared.config import get_config  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
-from shared.command_handler import command_handler_async  # noqa: E402
+from shared.command_handler import ShutdownRequested, command_handler_async  # noqa: E402
 from shared.network import check_port_free, get_local_ip, is_address_in_use, port_in_use_message  # noqa: E402
 from shared.symbols import ERROR, WARNING  # noqa: E402
 from handlers.server_handler import start_server_async  # noqa: E402
 from handlers.store import (  # noqa: E402
-    StoreError, count_clients, count_history, get_store_path, history_days, open_store, prune_history,
+    StoreError, close_store, count_clients, count_history, get_store_path, history_days, open_store, prune_history,
 )
 
 # how often old history is pruned while the server runs
 PRUNE_SECONDS = 24 * 60 * 60
 from handlers.web_handler import app, dashboard_warning  # noqa: E402
+from handlers.discovery import discovery_port, start_discovery  # noqa: E402
 from handlers.tls import ca_file, fingerprint, uvicorn_options  # noqa: E402
 
 NAME = get_config("NAME")
@@ -49,7 +50,8 @@ async def accept_clients(server):
     async with server:
         await server.serve_forever()
 
-async def start_web():
+def web_server():
+    """The dashboard's uvicorn server; main() runs its serve() and stops it on shutdown."""
     uv_config = uvicorn.Config(
         app,
         host=get_config("WEB_HOST", "0.0.0.0"),
@@ -59,8 +61,7 @@ async def start_web():
         # the same certificate as the client listener, HTTPS only on this port
         **uvicorn_options(),
     )
-    server = uvicorn.Server(uv_config)
-    await server.serve()
+    return uvicorn.Server(uv_config)
 
 def print_web_url():
     host = get_config("WEB_HOST", "0.0.0.0")
@@ -121,19 +122,54 @@ def check_ports():
                 sys.exit(f"{ERROR} {port_in_use_message(port, what)}")
             raise
 
+async def open_discovery():
+    """Answer the launcher's Find servers. A port that cannot be used is a warning, not a stop."""
+    port = discovery_port()
+    if port is None:
+        return None
+    try:
+        transport = await start_discovery(port)
+    except OSError as e:
+        reason = "already in use, probably by another pyhome server" if is_address_in_use(e) else str(e)
+        print(f"{WARNING} {YELLOW}Discovery off, UDP port {port} {reason}{RESET}")
+        return None
+    print(f"Discovery answering on UDP port {port}, Find servers in the launcher sees this server")
+    return transport
+
 async def main():
     check_ports()
     open_database()
     server = await start_server_async()
     print_web_url()
+    discovery = await open_discovery()
+
+    web = web_server()
+    web_task = asyncio.ensure_future(web.serve())
 
     # handlers
-    await asyncio.gather(
-        accept_clients(server),
-        start_web(),
-        prune_daily(),
-        command_handler_async(COMMAND_SOURCES)
-    )
+    try:
+        await asyncio.gather(
+            accept_clients(server),
+            web_task,
+            prune_daily(),
+            command_handler_async(COMMAND_SOURCES)
+        )
+    except ShutdownRequested:
+        # uvicorn's own way out: it finishes and stops, where a cancel would print a traceback
+        web.should_exit = True
+        await web_task
+        server.close()
+        # the client connections end here, while the store can still record when each was last seen
+        others = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+        for task in others:
+            task.cancel()
+        await asyncio.gather(*others, return_exceptions=True)
+        raise
+    finally:
+        if discovery is not None:
+            discovery.close()
+        # shutdown, Ctrl+C or a crash: the last connection folds the WAL file back into pyhome.db
+        close_store()
 
 # main
 if __name__ == "__main__":
@@ -149,6 +185,9 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print(f"\n{NAME} is turned off.")
+    except ShutdownRequested as e:
+        # the shutdown command, already said goodbye
+        sys.exit(e.code)
     except SystemExit as e:
         # sys.exit(1) etc reaches here too (uvicorn uses it on a bind failure);
         # a clean shutdown (exit(0)) must close without a prompt

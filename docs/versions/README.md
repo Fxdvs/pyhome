@@ -5,6 +5,7 @@ deliberately left for later. The newest version is at the top.
 
 | Version | Date | Theme | Notes |
 | --- | --- | --- | --- |
+| [1.4](v1.4.md) | 2026-10-31 | Easy setup, one window for the whole house | [spec](../v1.4-spec.md) |
 | [1.3](v1.3.md) | 2026-10-21 | The server remembers what it knows | [spec](../v1.3-spec.md) |
 | [1.2](v1.2.md) | 2026-10-21 | Encrypted transport | [spec](../v1.2-spec.md) |
 | [1.1](v1.1.md) | 2026-10-20 | Control from the browser, safely | [spec](../v1.1-spec.md) |

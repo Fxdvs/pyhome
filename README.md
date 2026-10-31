@@ -9,7 +9,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `1.3`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.4`, see [Known limitations](#known-limitations).
 
 ## Architecture
 
@@ -79,13 +79,63 @@ Several commands can be in flight at once: each `cmd` carries a
 py -m pip install -r requirements.txt
 ```
 
+- `pywebview` for the desktop launcher, which needs the system web view:
+  Windows 10 and 11 have it (WebView2), Linux needs GTK with WebKit2 or Qt
+  with WebEngine.
+
+```
+py -m pip install -r requirements-launcher.txt
+```
+
+## Configs and the token
+
+The real configs are not in git: they hold the token. Git has
+`server/data/config.example.json` and `client/data/config.example.json`, the
+defaults with an empty token. When `data/config.json` is missing, the app (and
+the launcher) copies the example to it on start and says so in one line. Edit
+`config.json`, never the example; `git status` never shows it.
+
+**Updating from v1.3 or older.** Git deletes `config.json` from the folder when
+a pulled commit stops tracking it, so copy them aside first:
+
+```
+copy server\data\config.json server\data\config.mine.json
+copy client\data\config.json client\data\config.mine.json
+git pull
+move server\data\config.mine.json server\data\config.json
+move client\data\config.mine.json client\data\config.json
+```
+
+Configs that were never committed, such as `client/data/kuchyna-svetlo.json`,
+are not touched by the pull.
+
 ## Running
 
-On Windows, double click `launcher.pyw`. It lists the server and every client
-config in `client/data/`. Tick what you want and press **Run**. Every app opens
-in its own console, the launcher shows which are running and stops them one by
-one or all at once. Stopping ends the process, the server sees that as an
-ordinary dropped connection.
+On Windows, double click `launcher.pyw`. One dark window holds the server and
+every client config in `client/data/` (the `*.example.json` templates
+excepted):
+
+- **the sidebar** lists them with a status dot: green running, gray stopped,
+  red ended with an error. **Spustiť označené** starts the ticked ones, the
+  server first, the clients two seconds later.
+- **the console** shows the selected app's output with its colors, and the
+  line under it types into that app, the same commands as in its own console
+  (`do kuch turn_on`, `list`, `help`).
+- **Zastaviť** asks the app to end the way a person would, `shutdown` and
+  `y`, so the server closes its database cleanly; an app that does not end
+  within 3 seconds is terminated.
+- **+ Nový klient** and **Upraviť** open a form instead of JSON: the id is
+  made from the name, the token and `ca.crt` come from the server on this
+  computer, a wrong field is marked with the reason. **Nastavenia servera**
+  has the ports, the token with **Vygenerovať**, and **Vytvoriť certifikáty**.
+- **Hľadať servery** in the client form lists every pyhome server on the
+  local network with its name, address, TLS and certificate fingerprint;
+  picking one fills the address. For a server on another computer the form
+  downloads its `ca.crt` and keeps it only when its fingerprint is the one
+  the server announced; compare that fingerprint with the server's startup
+  lines before trusting it.
+- What is ticked and selected is remembered in `launcher/state.json`. Closing
+  the window while apps run asks first.
 
 Or start them separately, each in its own console:
 
@@ -106,7 +156,7 @@ A new config file only needs `NAME`, the network settings and, for a device, `DE
 takes it from the file name (`kuchyna-svetlo.json` becomes `kuchyna-svetlo`)
 and writes it back into the file. A file name that is not a usable id, and
 `config.json`, get 8 random hex characters instead. So the quickest new device
-is: copy a config to `<room>-<device>.json` and empty its `ID`. The launcher
+is: copy `config.example.json` to `<room>-<device>.json` and fill it in. The launcher
 refuses configs that share an ID.
 
 To keep strangers out, put the same `TOKEN` in the server's config and in every
@@ -123,8 +173,9 @@ py -c "import secrets; print(secrets.token_urlsafe(16))"
 
 Upgrade every client before setting `TOKEN` on the server: an older client does
 not understand `denied` and keeps retrying instead of showing the reason.
-`client/data/config.json` and `server/data/config.json` are tracked in git, so a
-real token put there shows up in `git diff`. Keep real tokens out of commits.
+Every `*.json` in `client/data/` and `server/data/config.json` is ignored by
+git, so a token put there stays on your computer. Keep it out of the
+`*.example.json` files, which are in git.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:
@@ -164,7 +215,8 @@ pyhome/
 │   ├── app.py                    entry point, runs all handlers with asyncio.gather
 │   ├── make_certs.py             makes the TLS authority and server certificate
 │   ├── data/
-│   │   ├── config.json           server identity and network settings
+│   │   ├── config.example.json   the template config.json is made from, in git
+│   │   ├── config.json           server identity and network settings, not in git
 │   │   ├── certs/                TLS files from make_certs.py, not in git
 │   │   └── pyhome.db             the server's database, created at runtime, not in git
 │   ├── web/index.html            dashboard page, renders itself from /api/clients
@@ -173,11 +225,13 @@ pyhome/
 │       ├── store.py              the database: SQLAlchemy ORM over SQLite, the only module that knows SQL
 │       ├── client_handler.py     one coroutine per connected client
 │       ├── web_handler.py        FastAPI dashboard
+│       ├── discovery.py          answers Find servers on UDP, never with the token
 │       └── commands/             server only commands
 ├── client/
 │   ├── app.py                    entry point
 │   ├── devices/                  one package per kind of device (light, thermostat)
-│   ├── data/config.json          client identity and which server to reach
+│   ├── data/config.example.json  the template config.json is made from, in git
+│   ├── data/*.json               client identity and which server to reach, not in git
 │   └── client_handlers/          named apart from the server's handlers, so pytest can import both
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
@@ -185,7 +239,15 @@ pyhome/
 │       └── commands/             client only commands
 ├── tests/                        pytest, run all with py -m pytest
 ├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
-└── launcher.pyw                  GUI that starts and stops the server and clients
+├── launcher/                     the desktop launcher
+│   ├── core.py                   configs, ids, tokens, certificates
+│   ├── runner.py                 runs an app with pipes, keeps its output, types into it
+│   ├── discovery.py              asks the network which servers are there
+│   ├── api.py                    what the page calls, through pywebview
+│   ├── build_css.py              builds web/launcher.css with Tailwind's standalone CLI
+│   ├── web/                      the page: index.html, app.js, tailwind.css and the built launcher.css
+│   └── state.json                what is ticked and selected, not in git
+└── launcher.pyw                  opens the launcher window
 ```
 
 Server and client keep only what is genuinely their own. Everything that was the
@@ -209,6 +271,8 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 | `TLS_CERT`, `TLS_KEY` | server only, its certificate and key, relative to the config's folder. Empty for none |
 | `HISTORY_DAYS` | server only, how many days of device history `pyhome.db` keeps, `90` by default, `0` keeps none |
+| `DISCOVERY` | server only, `false` stops it answering the launcher's **Hľadať servery**. On by default |
+| `DISCOVERY_PORT` | server only, the UDP port it answers on, `50002` by default. The launcher asks on the one in this checkout's server config |
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
@@ -579,8 +643,20 @@ are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
 
 GitHub Actions runs the whole suite on every push and pull request, on
 Ubuntu and Windows with Python 3.10 and 3.13
-([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher's
-tests are skipped on a Python without `tkinter`.
+([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher is
+tested below its window (`launcher/api.py` and down); pywebview itself is not
+started in CI.
+
+The launcher's CSS is built from `launcher/web/tailwind.css` and committed, so
+running it needs no build step. After changing `tailwind.css`, `index.html`
+or `app.js`, rebuild it with Tailwind's standalone CLI, one executable from
+[its releases](https://github.com/tailwindlabs/tailwindcss/releases), no Node:
+
+```
+py launcher/build_css.py C:\tools\tailwindcss-windows-x64.exe
+```
+
+A test fails when the built file is older than its sources.
 
 ## Known limitations
 
@@ -595,6 +671,16 @@ tests are skipped on a Python without `tkinter`.
   computer, out of git and out of backups that leave the house.
 - **The browser keeps the token.** Anyone with the unlocked phone or computer
   has the dashboard, controls included, until **Odhlásiť** is pressed.
+- **Discovery is visible to the whole network.** Anyone on it can ask and
+  learns that a pyhome server runs at that address, its name, ports and
+  certificate fingerprint; never the token. `DISCOVERY: false` turns it off.
+  The answer itself proves nothing, which is why the form shows the
+  fingerprint to compare with the server's own startup lines, and a
+  `ca.crt` fetched from another computer must match it.
+- **Discovery reaches the local network only.** It asks each network this
+  computer is on as a /24 (`192.168.1.255`) and through `255.255.255.255`;
+  a server behind a router, or on a wider network, is typed in by hand. On
+  Windows the firewall asks once to let the server receive on UDP port 50002.
 - **One secret for everything.** Anyone with a client config has the token and
   so can control every device from the browser. Fine for one household, not
   for guests.
@@ -617,17 +703,20 @@ Done:
 12. ~~A database for the server's memory~~ (1.3)
 13. ~~Device state and history across restarts~~ (1.3)
 14. ~~Offline devices and history on the dashboard and the console~~ (1.3)
+15. ~~Configs made and edited in the launcher, real configs out of git~~ (1.4)
+16. ~~Apps and their output in one window~~ (1.4)
+17. ~~Finding the server on the network~~ (1.4)
 
 What each version delivered is in [docs/versions/](docs/versions/README.md).
 
 Next, one theme per version. Each gets its own spec in `docs/` before any
 code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
-[docs/v1.1-spec.md](docs/v1.1-spec.md), [docs/v1.2-spec.md](docs/v1.2-spec.md) and
-[docs/v1.3-spec.md](docs/v1.3-spec.md) did.
+[docs/v1.1-spec.md](docs/v1.1-spec.md), [docs/v1.2-spec.md](docs/v1.2-spec.md),
+[docs/v1.3-spec.md](docs/v1.3-spec.md) and [docs/v1.4-spec.md](docs/v1.4-spec.md) did.
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+| 1.4.1 | A new look for the launcher | The design made in Claude Design, carried into the theme tokens and the page; no change to what the launcher does |
 | 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
 Everything that is possible but not planned yet:
@@ -635,9 +724,8 @@ Everything that is possible but not planned yet:
 | Idea | Why it is not done yet | Version |
 | --- | --- | --- |
 | Devices from several folders | Nothing needs it yet | later |
-| Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
-| Choosing between several servers | One server is enough so far | 1.4 |
-| Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
+| Pairing with a code | The token already says who may connect | later |
+| An installer or a single `.exe` for the launcher | Packaging and signing are their own work | later |
 | Automations, rules and schedules | Not specified yet | later |
 | History charts on the dashboard | The history is recorded from 1.3, drawing it is its own piece of work | later |
 | A cloud copy for remote viewing | The house must work offline, a copy could only ever be an add-on | later |

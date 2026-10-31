@@ -14,10 +14,24 @@ import inspect
 import os
 import asyncio
 
-from shared.console import PROMPT
+from shared.console import prompt
 from shared.symbols import ERROR
 
 _commands = {}
+
+
+class ShutdownRequested(Exception):
+    """A command ended the app, the way shutdown does with exit(0).
+
+    A SystemExit inside asyncio tears the loop down mid step: tasks are
+    destroyed while pending and uvicorn prints tracebacks. As an ordinary
+    exception it leaves main() normally, asyncio.run then cancels the other
+    tasks in order, and app.py exits with code.
+    """
+
+    def __init__(self, code=0):
+        super().__init__(f"shutdown with code {code}")
+        self.code = code
 
 
 def get_commands():
@@ -86,7 +100,7 @@ async def command_handler_async(sources):
     while True:
         try:
             # input blocks, so it runs off the event loop
-            cmd_input = await loop.run_in_executor(None, input, PROMPT)
+            cmd_input = await loop.run_in_executor(None, input, prompt())
             cmd_input = cmd_input.strip()
 
             if not cmd_input:
@@ -104,6 +118,8 @@ async def command_handler_async(sources):
                     await run(*params)
                 else:
                     await loop.run_in_executor(None, run, *params)
+            except SystemExit as e:
+                raise ShutdownRequested(e.code) from None
             except TypeError as e:
                 # most likely the command was given parameters it does not take
                 print(f"{ERROR} Bad parameters for '{cmd}': {e}")
@@ -113,5 +129,7 @@ async def command_handler_async(sources):
         except EOFError:
             # stdin closed, nothing left to read
             return
+        except ShutdownRequested:
+            raise
         except Exception as e:
             print(f"{ERROR} Command handler error: {e}")
