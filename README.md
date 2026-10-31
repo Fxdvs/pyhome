@@ -9,7 +9,7 @@ directions.
 
 Both sides run as a console application with their own command prompt.
 
-**Status:** server and client `1.3`, see [Known limitations](#known-limitations).
+**Status:** server and client `1.4`, see [Known limitations](#known-limitations).
 
 ## Architecture
 
@@ -703,17 +703,20 @@ Done:
 12. ~~A database for the server's memory~~ (1.3)
 13. ~~Device state and history across restarts~~ (1.3)
 14. ~~Offline devices and history on the dashboard and the console~~ (1.3)
+15. ~~Configs made and edited in the launcher, real configs out of git~~ (1.4)
+16. ~~Apps and their output in one window~~ (1.4)
+17. ~~Finding the server on the network~~ (1.4)
 
 What each version delivered is in [docs/versions/](docs/versions/README.md).
 
 Next, one theme per version. Each gets its own spec in `docs/` before any
 code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
-[docs/v1.1-spec.md](docs/v1.1-spec.md), [docs/v1.2-spec.md](docs/v1.2-spec.md) and
-[docs/v1.3-spec.md](docs/v1.3-spec.md) did.
+[docs/v1.1-spec.md](docs/v1.1-spec.md), [docs/v1.2-spec.md](docs/v1.2-spec.md),
+[docs/v1.3-spec.md](docs/v1.3-spec.md) and [docs/v1.4-spec.md](docs/v1.4-spec.md) did.
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.4 | Easier setup ([spec](docs/v1.4-spec.md)) | A desktop launcher in HTML and Tailwind on pywebview: apps and their output in one window, a form for new clients, tokens and certificates by button, finding the server on the network, real configs kept out of git |
+| 1.4.1 | A new look for the launcher | The design made in Claude Design, carried into the theme tokens and the page; no change to what the launcher does |
 | 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
 Everything that is possible but not planned yet:
@@ -721,9 +724,8 @@ Everything that is possible but not planned yet:
 | Idea | Why it is not done yet | Version |
 | --- | --- | --- |
 | Devices from several folders | Nothing needs it yet | later |
-| Launcher: create and edit configs, remember the selection, show output | Not needed to run the system | 1.4 |
-| Choosing between several servers | One server is enough so far | 1.4 |
-| Pairing or discovery UI | Configs are set up by hand while devices are few | 1.4 |
+| Pairing with a code | The token already says who may connect | later |
+| An installer or a single `.exe` for the launcher | Packaging and signing are their own work | later |
 | Automations, rules and schedules | Not specified yet | later |
 | History charts on the dashboard | The history is recorded from 1.3, drawing it is its own piece of work | later |
 | A cloud copy for remote viewing | The house must work offline, a copy could only ever be an add-on | later |
