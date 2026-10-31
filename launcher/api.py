@@ -9,17 +9,19 @@ pywebview exposes every public attribute of this object to the page, so
 everything that is not a method for the page starts with an underscore.
 """
 import os
+import shutil
+import tempfile
 import threading
 import time
 
-from launcher import core
+from launcher import core, discovery
 from launcher.runner import Runner
 
 SERVER = "server"
 
 
 class Api:
-    def __init__(self, root=core.ROOT_DIR, head_start=core.SERVER_HEAD_START_MS / 1000):
+    def __init__(self, root=core.ROOT_DIR, head_start=core.SERVER_HEAD_START_MS / 1000, discovery_hosts=None):
         self._server_dir = os.path.join(root, "server")
         self._client_dir = os.path.join(root, "client")
         self._server_config = os.path.join(self._server_dir, "data", "config.json")
@@ -29,6 +31,8 @@ class Api:
         self._make_certs = os.path.join(self._server_dir, "make_certs.py")
         self._state_path = os.path.join(root, "launcher", "state.json")
         self._head_start = head_start
+        # where Find servers asks; None is every network this computer is on
+        self._discovery_hosts = discovery_hosts
         self._lock = threading.RLock()
         self._runners = {}
         self._window = None
@@ -238,17 +242,49 @@ class Api:
         }
         return form
 
+    def find_servers(self):
+        """The servers that answer on the network, each marked "here" when it is the one in this checkout."""
+        here = self._read(self._server_config)
+        port = here.get("DISCOVERY_PORT", discovery.DEFAULT_PORT)
+        servers = discovery.find_servers(port, hosts=self._discovery_hosts)
+        for server in servers:
+            server["here"] = server["id"] == here.get("ID") and server["port"] == here.get("PORT")
+        return servers
+
     def save_client(self, fields, key=None):
-        """{"ok", "errors" per field, "key" of the saved config, "running" when it runs with the old settings}."""
+        """{"ok", "errors" per field, "key" of the saved config, "running" when it runs with the old settings}.
+
+        fields["server"] is the server picked from Find servers, if one was. With
+        TLS, a server elsewhere gives its ca.crt over its dashboard, checked
+        against the fingerprint it announced; the one here is copied from disk.
+        """
         fields = dict(fields or {})
+        picked = fields.pop("server", None)
         if fields.get("use_server_token"):
             fields["token"] = core.server_token(self._server_config)
         original = self._config_path(key) if key else None
+        ca_source = os.path.join(self._certs_dir, "ca.crt")
+        fetched = None
+        if fields.get("tls") and isinstance(picked, dict) and not picked.get("here"):
+            if not picked.get("tls"):
+                return {"ok": False, "errors": {"tls": f"Server {picked.get('name')} nemá TLS, vypni ho tu"}}
+            try:
+                pem = discovery.fetch_ca(str(fields.get("host") or picked.get("host")).strip(),
+                                         picked.get("web_port"), picked.get("fingerprint"))
+            except discovery.CAError as e:
+                return {"ok": False, "errors": {"tls": str(e)}}
+            fetched = tempfile.mkdtemp()
+            ca_source = os.path.join(fetched, "ca.crt")
+            with open(ca_source, "w", encoding="ascii") as f:
+                f.write(pem)
         try:
             path = core.save_client(fields, data_dir=self._client_data, devices=self.devices(),
-                                    ca_source=os.path.join(self._certs_dir, "ca.crt"), original_path=original)
+                                    ca_source=ca_source, original_path=original)
         except core.ConfigError as e:
             return {"ok": False, "errors": e.errors}
+        finally:
+            if fetched:
+                shutil.rmtree(fetched, ignore_errors=True)
         new_key = os.path.basename(path)
         with self._lock:
             if key and key != new_key and key in self._runners:
