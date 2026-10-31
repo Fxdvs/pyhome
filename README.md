@@ -627,7 +627,7 @@ code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
 
 | Version | Theme | Contents |
 | --- | --- | --- |
-| 1.4 | Easier setup | Launcher creates and edits configs, remembers the last selection and shows app output, choosing between several servers, pairing or discovery |
+| 1.4 | Easier setup ([spec](docs/v1.4-spec.md)) | A desktop launcher in HTML and Tailwind on pywebview: apps and their output in one window, a form for new clients, tokens and certificates by button, finding the server on the network, real configs kept out of git |
 | 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
 
 Everything that is possible but not planned yet:
