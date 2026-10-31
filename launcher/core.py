@@ -370,3 +370,26 @@ def make_certificates(hosts=(), server_config=SERVER_CONFIG, make_certs=MAKE_CER
     data["TLS_KEY"] = "certs/server.key"
     write_config(server_config, data)
     return True, output
+
+
+# What the launcher remembers
+
+def load_state(path):
+    """{"checked": [keys], "selected": key or None}, or None when nothing is remembered yet.
+
+    A broken file counts as nothing remembered: it is only a convenience.
+    """
+    try:
+        data = read_config(path)
+    except (OSError, ValueError):
+        return None
+    checked = data.get("checked")
+    selected = data.get("selected")
+    return {
+        "checked": [key for key in checked if isinstance(key, str)] if isinstance(checked, list) else [],
+        "selected": selected if isinstance(selected, str) else None,
+    }
+
+
+def save_state(path, state):
+    write_config(path, {"checked": list(state["checked"]), "selected": state["selected"]})
