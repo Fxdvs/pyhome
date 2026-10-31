@@ -234,6 +234,9 @@ let clientKey = null;
 let clientDevice = "";
 let idTouched = false;
 let serverHere = {};
+// what Find servers found, and the one picked from it (null: the address was typed)
+let foundServers = [];
+let picked = null;
 
 function renderDevices(devices) {
   const options = [...devices, ""];
@@ -254,16 +257,88 @@ function renderDevices(devices) {
 
 function updateClientHints() {
   const form = $("clientForm");
+  const remote = picked && !picked.here;
   const useToken = form.elements.use_server_token;
-  useToken.disabled = !serverHere.token;
-  if (!serverHere.token) useToken.checked = false;
-  $("tokenHint").textContent = serverHere.token ? "" : "server na tomto počítači nemá token";
+  if (remote) {
+    // the token here belongs to the server in this checkout, not to that one
+    useToken.disabled = true;
+    useToken.checked = false;
+    $("tokenHint").textContent = picked.token_required
+      ? "server je na inom počítači, jeho token zadaj nižšie"
+      : "server je na inom počítači a token nepožaduje";
+  } else {
+    useToken.disabled = !serverHere.token;
+    if (!serverHere.token) useToken.checked = false;
+    $("tokenHint").textContent = serverHere.token ? "" : "server na tomto počítači nemá token";
+  }
   $("tokenField").hidden = useToken.checked;
+
   const tls = form.elements.tls;
-  $("tlsHint").textContent = serverHere.tls ? "" : "server ešte nemá certifikáty, vytvor ich v nastaveniach servera";
-  if (!serverHere.tls && !tls.checked) tls.disabled = true;
-  else tls.disabled = false;
+  if (picked && !picked.tls) {
+    tls.checked = false;
+    tls.disabled = true;
+    $("tlsHint").textContent = "tento server nemá TLS";
+  } else if (remote) {
+    tls.disabled = false;
+    $("tlsHint").textContent = "ca.crt sa stiahne zo servera a overí podľa odtlačku vyššie";
+  } else {
+    $("tlsHint").textContent = serverHere.tls ? "" : "server ešte nemá certifikáty, vytvor ich v nastaveniach servera";
+    tls.disabled = !serverHere.tls && !tls.checked;
+  }
   updateClientFile();
+}
+
+function renderServers() {
+  $("servers").innerHTML = foundServers
+    .map((server, index) => {
+      const on = server === picked;
+      const facts = [server.here ? "na tomto počítači" : "v sieti", server.tls ? "TLS" : "bez TLS",
+        server.token_required ? "token" : "bez tokenu"];
+      return `<button type="button" data-server="${index}" aria-pressed="${on}"
+        class="grid gap-0.5 rounded-[10px] border px-3 py-2 text-left text-[12.5px] ${on ? "border-accent/60 bg-accent-soft" : "border-edge-soft bg-hi hover:border-accent/40"}">
+        <span class="font-semibold">${esc(server.name)} · ${esc(server.host)}:${server.port}</span>
+        <span class="text-muted">${facts.join(" · ")}</span>
+        ${server.tls ? `<code class="break-all font-mono text-[11px] text-muted">SHA-256 ${esc(server.fingerprint)}</code>` : ""}
+      </button>`;
+    })
+    .join("");
+}
+
+async function findServers() {
+  const button = $("findServers");
+  button.disabled = true;
+  $("findState").textContent = "Hľadám…";
+  try {
+    foundServers = await backend.call("find_servers");
+  } finally {
+    button.disabled = false;
+  }
+  const n = foundServers.length;
+  $("findState").textContent = n
+    ? `${plural(n, "Odpovedal", "Odpovedali", "Odpovedalo")} ${n} ${plural(n, "server", "servery", "serverov")}. Vyber ${plural(n, "ho", "jeden", "jeden")} a porovnaj odtlačok s tým, čo vypísal server.`
+    : "Žiadny server neodpovedal. Beží? Firewall musí pustiť UDP port 50002.";
+  if (picked && !foundServers.includes(picked)) picked = null;
+  renderServers();
+}
+
+function pickServer(index) {
+  const form = $("clientForm");
+  picked = foundServers[index];
+  form.elements.host.value = picked.host;
+  form.elements.port.value = String(picked.port);
+  if (picked.tls) form.elements.tls.checked = true;
+  renderServers();
+  updateClientHints();
+}
+
+// typing an address of its own drops the picked server
+function serverTyped() {
+  const form = $("clientForm");
+  if (picked && (form.elements.host.value.trim() !== picked.host || form.elements.port.value.trim() !== String(picked.port))) {
+    picked = null;
+    renderServers();
+    updateClientHints();
+  }
 }
 
 function updateClientFile() {
@@ -284,6 +359,10 @@ async function openClient(key = null) {
   for (const name of ["name", "id", "host", "port", "token"]) form.elements[name].value = answer.fields[name];
   form.elements.use_server_token.checked = answer.fields.use_server_token;
   form.elements.tls.checked = answer.fields.tls;
+  foundServers = [];
+  picked = null;
+  renderServers();
+  $("findState").textContent = "";
   $("clientTitle").textContent = key ? "Upraviť klienta" : "Nový klient";
   $("clientSave").textContent = key ? "Uložiť" : "Vytvoriť a spustiť";
   renderDevices(answer.devices);
@@ -305,6 +384,7 @@ async function saveClient(event) {
     use_server_token: form.elements.use_server_token.checked,
     token: form.elements.token.value,
     tls: form.elements.tls.checked,
+    server: picked,
   };
   const answer = await backend.call("save_client", fields, clientKey);
   showErrors(form, answer.errors);
@@ -430,6 +510,13 @@ function wire() {
     updateClientFile();
   });
   clientForm.elements.use_server_token.addEventListener("change", updateClientHints);
+  clientForm.elements.host.addEventListener("input", serverTyped);
+  clientForm.elements.port.addEventListener("input", serverTyped);
+  $("findServers").addEventListener("click", findServers);
+  $("servers").addEventListener("click", (event) => {
+    const card = event.target.closest("[data-server]");
+    if (card) pickServer(Number(card.dataset.server));
+  });
 
   $("serverForm").addEventListener("submit", saveServer);
   $("generateToken").addEventListener("click", async () => {

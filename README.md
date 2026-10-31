@@ -128,6 +128,12 @@ excepted):
   made from the name, the token and `ca.crt` come from the server on this
   computer, a wrong field is marked with the reason. **Nastavenia servera**
   has the ports, the token with **Vygenerovať**, and **Vytvoriť certifikáty**.
+- **Hľadať servery** in the client form lists every pyhome server on the
+  local network with its name, address, TLS and certificate fingerprint;
+  picking one fills the address. For a server on another computer the form
+  downloads its `ca.crt` and keeps it only when its fingerprint is the one
+  the server announced; compare that fingerprint with the server's startup
+  lines before trusting it.
 - What is ticked and selected is remembered in `launcher/state.json`. Closing
   the window while apps run asks first.
 
@@ -219,6 +225,7 @@ pyhome/
 │       ├── store.py              the database: SQLAlchemy ORM over SQLite, the only module that knows SQL
 │       ├── client_handler.py     one coroutine per connected client
 │       ├── web_handler.py        FastAPI dashboard
+│       ├── discovery.py          answers Find servers on UDP, never with the token
 │       └── commands/             server only commands
 ├── client/
 │   ├── app.py                    entry point
@@ -235,6 +242,7 @@ pyhome/
 ├── launcher/                     the desktop launcher
 │   ├── core.py                   configs, ids, tokens, certificates
 │   ├── runner.py                 runs an app with pipes, keeps its output, types into it
+│   ├── discovery.py              asks the network which servers are there
 │   ├── api.py                    what the page calls, through pywebview
 │   ├── build_css.py              builds web/launcher.css with Tailwind's standalone CLI
 │   ├── web/                      the page: index.html, app.js, tailwind.css and the built launcher.css
@@ -263,6 +271,8 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `WEB_PORT` | server only, dashboard port, `50001` by default |
 | `TLS_CERT`, `TLS_KEY` | server only, its certificate and key, relative to the config's folder. Empty for none |
 | `HISTORY_DAYS` | server only, how many days of device history `pyhome.db` keeps, `90` by default, `0` keeps none |
+| `DISCOVERY` | server only, `false` stops it answering the launcher's **Hľadať servery**. On by default |
+| `DISCOVERY_PORT` | server only, the UDP port it answers on, `50002` by default. The launcher asks on the one in this checkout's server config |
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
 The server can rename itself at runtime with `data config edit name`.
@@ -661,6 +671,16 @@ A test fails when the built file is older than its sources.
   computer, out of git and out of backups that leave the house.
 - **The browser keeps the token.** Anyone with the unlocked phone or computer
   has the dashboard, controls included, until **Odhlásiť** is pressed.
+- **Discovery is visible to the whole network.** Anyone on it can ask and
+  learns that a pyhome server runs at that address, its name, ports and
+  certificate fingerprint; never the token. `DISCOVERY: false` turns it off.
+  The answer itself proves nothing, which is why the form shows the
+  fingerprint to compare with the server's own startup lines, and a
+  `ca.crt` fetched from another computer must match it.
+- **Discovery reaches the local network only.** It asks each network this
+  computer is on as a /24 (`192.168.1.255`) and through `255.255.255.255`;
+  a server behind a router, or on a wider network, is typed in by hand. On
+  Windows the firewall asks once to let the server receive on UDP port 50002.
 - **One secret for everything.** Anyone with a client config has the token and
   so can control every device from the browser. Fine for one household, not
   for guests.
