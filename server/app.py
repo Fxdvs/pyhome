@@ -27,6 +27,7 @@ from handlers.store import (  # noqa: E402
 # how often old history is pruned while the server runs
 PRUNE_SECONDS = 24 * 60 * 60
 from handlers.web_handler import app, dashboard_warning  # noqa: E402
+from handlers.discovery import discovery_port, start_discovery  # noqa: E402
 from handlers.tls import ca_file, fingerprint, uvicorn_options  # noqa: E402
 
 NAME = get_config("NAME")
@@ -121,11 +122,26 @@ def check_ports():
                 sys.exit(f"{ERROR} {port_in_use_message(port, what)}")
             raise
 
+async def open_discovery():
+    """Answer the launcher's Find servers. A port that cannot be used is a warning, not a stop."""
+    port = discovery_port()
+    if port is None:
+        return None
+    try:
+        transport = await start_discovery(port)
+    except OSError as e:
+        reason = "already in use, probably by another pyhome server" if is_address_in_use(e) else str(e)
+        print(f"{WARNING} {YELLOW}Discovery off, UDP port {port} {reason}{RESET}")
+        return None
+    print(f"Discovery answering on UDP port {port}, Find servers in the launcher sees this server")
+    return transport
+
 async def main():
     check_ports()
     open_database()
     server = await start_server_async()
     print_web_url()
+    discovery = await open_discovery()
 
     web = web_server()
     web_task = asyncio.ensure_future(web.serve())
@@ -150,6 +166,8 @@ async def main():
         await asyncio.gather(*others, return_exceptions=True)
         raise
     finally:
+        if discovery is not None:
+            discovery.close()
         # shutdown, Ctrl+C or a crash: the last connection folds the WAL file back into pyhome.db
         close_store()
 
