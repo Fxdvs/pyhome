@@ -137,7 +137,9 @@ function renderHeader() {
   const server = apps.find((a) => a.kind === "server");
   const chip = $("serverChip");
   const on = server.status.state === "running";
-  chip.textContent = `Server ${server.name} ${on ? "beží" : stateLabel(server.status)} · ${server.chips.join(" · ")}`;
+  // "Server Server" when the server is still called by its default name
+  const label = server.name.toLowerCase() === "server" ? "Server" : `Server ${server.name}`;
+  chip.textContent = `${label} ${on ? "beží" : stateLabel(server.status)} · ${server.chips.join(" · ")}`;
   chip.className = on
     ? "rounded-full border border-ok/25 bg-ok/12 px-2.5 py-0.5 text-[11px] text-ok"
     : "rounded-full border border-edge-soft bg-hi px-2.5 py-0.5 text-[11px] text-muted";
