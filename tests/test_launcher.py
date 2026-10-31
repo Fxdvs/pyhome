@@ -1,13 +1,8 @@
-"""launcher.pyw: the Tkinter window loads and uses launcher/core.py."""
+"""launcher.pyw: the window opens the page with the api; pywebview itself is not started here."""
 import importlib.util
 import os
 import sys
 from importlib.machinery import SourceFileLoader
-
-import pytest
-
-# the window is tkinter; a python without tkinter cannot even import it
-pytest.importorskip("tkinter")
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(TESTS_DIR)
@@ -23,9 +18,13 @@ def load_window():
     return module
 
 
-def test_window_uses_the_core():
-    from launcher import core
+def test_loads_without_pywebview():
+    # pywebview is imported in main(), so a missing one is a message, not a traceback on load
     window = load_window()
-    assert window.list_client_configs is core.list_client_configs
-    assert window.App is core.App
-    assert window.ensure_default_configs is core.ensure_default_configs
+    assert os.path.isfile(window.INDEX)
+    assert "requirements-launcher.txt" in window.INSTALL
+
+
+def test_the_tkinter_window_is_gone():
+    with open(os.path.join(ROOT_DIR, "launcher.pyw"), encoding="utf-8") as f:
+        assert "tkinter" not in f.read()

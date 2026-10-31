@@ -1,4 +1,4 @@
-"""What the launcher does, without any window: configs, tokens, certificates and the apps it starts.
+"""What the launcher does, without any window: configs, tokens, certificates, and how an app is started.
 
 The window only calls these functions, so everything here is tested on its
 own, and a different window later reuses all of it.
@@ -28,21 +28,11 @@ DEVICES_DIR = os.path.join(CLIENT_DIR, "devices")
 SERVER_CERTS_DIR = os.path.join(SERVER_DIR, "data", "certs")
 MAKE_CERTS = os.path.join(SERVER_DIR, "make_certs.py")
 
-# only exists on windows, elsewhere the apps share the launcher's terminal
-NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-
-# how often the status column is refreshed, in milliseconds
-POLL_MS = 1000
-
 # Popen returns as soon as the server process exists, well before it has
 # imported fastapi/uvicorn and started listening. A client started right away
 # would fail its first connection attempt and then sit out its own retry
 # delay, so give the server a head start before starting any client.
 SERVER_HEAD_START_MS = 2000
-
-COLOR_RUNNING = "#2e7d32"
-COLOR_STOPPED = "#757575"
-COLOR_EXITED = "#c62828"
 
 
 def python_executable(executable=sys.executable):
@@ -102,55 +92,6 @@ def list_client_configs(data_dir):
 
 def build_command(config_path):
     return [python_executable(), "app.py", "--config", config_path]
-
-
-def head_start_ms(server_started):
-    """0, unless server_started, then SERVER_HEAD_START_MS."""
-    return SERVER_HEAD_START_MS if server_started else 0
-
-
-class App:
-    """One server or client process that the launcher started, or can start."""
-
-    def __init__(self, label, app_dir, config_path, creationflags=NEW_CONSOLE):
-        self.label = label
-        self.app_dir = app_dir
-        self.config_path = config_path
-        self.creationflags = creationflags
-        self.process = None
-
-    def is_running(self):
-        return self.process is not None and self.process.poll() is None
-
-    def status(self):
-        if self.process is None:
-            return "stopped"
-        code = self.process.poll()
-        if code is None:
-            return "running"
-        return f"exited ({code})"
-
-    def start(self):
-        """Returns False when it was already running."""
-        if self.is_running():
-            return False
-        self.process = subprocess.Popen(
-            build_command(self.config_path),
-            cwd=self.app_dir,
-            creationflags=self.creationflags,
-        )
-        return True
-
-    def stop(self):
-        # terminate, the app's own shutdown needs someone typing in its console
-        if self.is_running():
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-        self.process = None
 
 
 # Configs

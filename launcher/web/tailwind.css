@@ -1,0 +1,81 @@
+/* The launcher's look: dark glass in the style of macOS.
+   Every color and font is a token here, so a light theme or another accent is a change in this block.
+   Built into launcher.css by launcher/build_css.py; the page uses Tailwind utilities from these tokens. */
+@import "tailwindcss" source(none);
+@source "./index.html";
+@source "./app.js";
+
+@theme {
+  --color-wall: #07080d;
+  --color-glass: rgb(30 32 40 / 0.55);
+  --color-glass-strong: rgb(24 26 33 / 0.94);
+  --color-hi: rgb(255 255 255 / 0.07);
+  --color-edge: rgb(255 255 255 / 0.1);
+  --color-edge-soft: rgb(255 255 255 / 0.06);
+  --color-fg: #f2f2f7;
+  --color-muted: rgb(235 235 245 / 0.58);
+  --color-faint: rgb(235 235 245 / 0.32);
+  --color-accent: #0a84ff;
+  --color-accent-hover: #2a95ff;
+  --color-accent-soft: rgb(10 132 255 / 0.18);
+  --color-accent-fg: #64b5ff;
+  --color-console: rgb(0 0 0 / 0.34);
+  --color-ok: #30d158;
+  --color-warn: #ff9f0a;
+  --color-bad: #ff453a;
+  --color-purple: #bf5af2;
+  --color-cyan: #64d2ff;
+  --color-blob-1: #3a2cff;
+  --color-blob-2: #b0219f;
+  --color-blob-3: #0a84ff;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+}
+
+@layer base {
+  :root { color-scheme: dark; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; opacity: 0.45; }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-edge); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+}
+
+@layer components {
+  .btn {
+    border: 1px solid var(--color-edge); background: var(--color-hi); color: var(--color-fg);
+    padding: 6px 13px; border-radius: 8px; font-weight: 500; white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.12); }
+  .btn-primary {
+    background: var(--color-accent); border-color: transparent; color: #fff;
+    box-shadow: 0 4px 14px rgb(10 132 255 / 0.35);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+  .btn-danger:hover:not(:disabled) { color: var(--color-bad); }
+  .field-input {
+    width: 100%; min-width: 0; border: 1px solid var(--color-edge); background: rgb(0 0 0 / 0.25);
+    color: var(--color-fg); border-radius: 8px; padding: 7px 10px;
+  }
+  .field-input::placeholder { color: var(--color-faint); }
+  .field-input[aria-invalid="true"] { border-color: var(--color-bad); }
+  .glass { backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); }
+
+  /* the dot in front of every app */
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-faint); }
+  .dot-running { background: var(--color-ok); box-shadow: 0 0 10px rgb(48 209 88 / 0.7); }
+  .dot-exited { background: var(--color-bad); box-shadow: 0 0 10px rgb(255 69 58 / 0.6); }
+
+  /* the eight ANSI colors the apps print, in the theme's colors */
+  .ansi-black { color: var(--color-faint); }
+  .ansi-red { color: var(--color-bad); }
+  .ansi-green { color: var(--color-ok); }
+  .ansi-yellow { color: var(--color-warn); }
+  .ansi-blue { color: var(--color-accent-fg); }
+  .ansi-magenta { color: var(--color-purple); }
+  .ansi-cyan { color: var(--color-cyan); }
+  .ansi-white { color: var(--color-fg); }
+  .ansi-gray { color: var(--color-faint); }
+  .ansi-bold { font-weight: 700; }
+}

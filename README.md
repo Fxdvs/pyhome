@@ -79,6 +79,14 @@ Several commands can be in flight at once: each `cmd` carries a
 py -m pip install -r requirements.txt
 ```
 
+- `pywebview` for the desktop launcher, which needs the system web view:
+  Windows 10 and 11 have it (WebView2), Linux needs GTK with WebKit2 or Qt
+  with WebEngine.
+
+```
+py -m pip install -r requirements-launcher.txt
+```
+
 ## Configs and the token
 
 The real configs are not in git: they hold the token. Git has
@@ -103,11 +111,25 @@ are not touched by the pull.
 
 ## Running
 
-On Windows, double click `launcher.pyw`. It lists the server and every client
-config in `client/data/` (the `*.example.json` templates excepted). Tick what you want and press **Run**. Every app opens
-in its own console, the launcher shows which are running and stops them one by
-one or all at once. Stopping ends the process, the server sees that as an
-ordinary dropped connection.
+On Windows, double click `launcher.pyw`. One dark window holds the server and
+every client config in `client/data/` (the `*.example.json` templates
+excepted):
+
+- **the sidebar** lists them with a status dot: green running, gray stopped,
+  red ended with an error. **Spustiť označené** starts the ticked ones, the
+  server first, the clients two seconds later.
+- **the console** shows the selected app's output with its colors, and the
+  line under it types into that app, the same commands as in its own console
+  (`do kuch turn_on`, `list`, `help`).
+- **Zastaviť** asks the app to end the way a person would, `shutdown` and
+  `y`, so the server closes its database cleanly; an app that does not end
+  within 3 seconds is terminated.
+- **+ Nový klient** and **Upraviť** open a form instead of JSON: the id is
+  made from the name, the token and `ca.crt` come from the server on this
+  computer, a wrong field is marked with the reason. **Nastavenia servera**
+  has the ports, the token with **Vygenerovať**, and **Vytvoriť certifikáty**.
+- What is ticked and selected is remembered in `launcher/state.json`. Closing
+  the window while apps run asks first.
 
 Or start them separately, each in its own console:
 
@@ -210,8 +232,14 @@ pyhome/
 │       └── commands/             client only commands
 ├── tests/                        pytest, run all with py -m pytest
 ├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
-├── launcher/core.py              the launcher's logic: configs, ids, tokens, certificates
-└── launcher.pyw                  GUI that starts and stops the server and clients
+├── launcher/                     the desktop launcher
+│   ├── core.py                   configs, ids, tokens, certificates
+│   ├── runner.py                 runs an app with pipes, keeps its output, types into it
+│   ├── api.py                    what the page calls, through pywebview
+│   ├── build_css.py              builds web/launcher.css with Tailwind's standalone CLI
+│   ├── web/                      the page: index.html, app.js, tailwind.css and the built launcher.css
+│   └── state.json                what is ticked and selected, not in git
+└── launcher.pyw                  opens the launcher window
 ```
 
 Server and client keep only what is genuinely their own. Everything that was the
@@ -605,8 +633,20 @@ are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
 
 GitHub Actions runs the whole suite on every push and pull request, on
 Ubuntu and Windows with Python 3.10 and 3.13
-([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher's
-tests are skipped on a Python without `tkinter`.
+([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher is
+tested below its window (`launcher/api.py` and down); pywebview itself is not
+started in CI.
+
+The launcher's CSS is built from `launcher/web/tailwind.css` and committed, so
+running it needs no build step. After changing `tailwind.css`, `index.html`
+or `app.js`, rebuild it with Tailwind's standalone CLI, one executable from
+[its releases](https://github.com/tailwindlabs/tailwindcss/releases), no Node:
+
+```
+py launcher/build_css.py C:\tools\tailwindcss-windows-x64.exe
+```
+
+A test fails when the built file is older than its sources.
 
 ## Known limitations
 
