@@ -210,6 +210,7 @@ pyhome/
 │       └── commands/             client only commands
 ├── tests/                        pytest, run all with py -m pytest
 ├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
+├── launcher/core.py              the launcher's logic: configs, ids, tokens, certificates
 └── launcher.pyw                  GUI that starts and stops the server and clients
 ```
 

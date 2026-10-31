@@ -2,148 +2,21 @@
 
 Clients are every config file in client/data, so a config file is one instance
 with its own id. The launcher holds the processes it started, shows whether
-they are still running and can stop them.
+they are still running and can stop them. What it does lives in launcher/core.py.
 """
-import json
 import os
-import subprocess
 import sys
 import tkinter as tk
 from tkinter import messagebox
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-# the shared package sits next to this file, like for the apps
+# the shared and launcher packages sit next to this file
 sys.path.insert(0, ROOT_DIR)
 
-from shared.config import id_warning  # noqa: E402
-
-SERVER_DIR = os.path.join(ROOT_DIR, "server")
-CLIENT_DIR = os.path.join(ROOT_DIR, "client")
-SERVER_CONFIG = os.path.join(SERVER_DIR, "data", "config.json")
-CLIENT_DATA_DIR = os.path.join(CLIENT_DIR, "data")
-
-# only exists on windows, elsewhere the apps share the launcher's terminal
-NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-
-# how often the status column is refreshed, in milliseconds
-POLL_MS = 1000
-
-# Popen returns as soon as the server process exists, well before it has
-# imported fastapi/uvicorn and started listening. A client started right away
-# would fail its first connection attempt and then sit out its own retry
-# delay, so give the server a head start before starting any client.
-SERVER_HEAD_START_MS = 2000
-
-COLOR_RUNNING = "#2e7d32"
-COLOR_STOPPED = "#757575"
-COLOR_EXITED = "#c62828"
-
-
-def python_executable(executable=sys.executable):
-    """The console python next to executable.
-
-    Double clicking a .pyw runs pythonw.exe, which has no console. The apps
-    would inherit it and their windows would never open.
-    """
-    folder, name = os.path.split(executable)
-    if name.lower() == "pythonw.exe":
-        return os.path.join(folder, "python.exe")
-    return executable
-
-
-def list_client_configs(data_dir):
-    """One entry per *.json in data_dir, sorted by file name.
-
-    Two configs sharing a non-empty id would collapse into one row wherever
-    the id is the key (the dashboard, clients.json, `send <id>`), so both are
-    flagged with an error instead of silently letting that happen. An id
-    that breaks the id rule only gets a note, the config still runs.
-    """
-    if not os.path.isdir(data_dir):
-        return []
-
-    entries = []
-    for file in sorted(os.listdir(data_dir)):
-        if not file.endswith(".json"):
-            continue
-
-        path = os.path.join(data_dir, file)
-        entry = {"file": file, "path": path, "name": None, "device": None, "id": None, "error": None, "note": None}
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            entry["name"] = data.get("NAME")
-            entry["device"] = data.get("DEVICE") or None
-            entry["id"] = data.get("ID") or None
-            if entry["id"]:
-                entry["note"] = id_warning(entry["id"])
-        except (OSError, ValueError, AttributeError):
-            # AttributeError: valid JSON that is not an object has no .get
-            entry["error"] = "invalid JSON"
-        entries.append(entry)
-
-    seen = {}
-    for entry in entries:
-        if entry["id"]:
-            seen[entry["id"]] = seen.get(entry["id"], 0) + 1
-    for entry in entries:
-        if entry["id"] and seen[entry["id"]] > 1:
-            entry["error"] = f"duplicate ID {entry['id']}"
-
-    return entries
-
-
-def build_command(config_path):
-    return [python_executable(), "app.py", "--config", config_path]
-
-
-def head_start_ms(server_started):
-    """0, unless server_started, then SERVER_HEAD_START_MS."""
-    return SERVER_HEAD_START_MS if server_started else 0
-
-
-class App:
-    """One server or client process that the launcher started, or can start."""
-
-    def __init__(self, label, app_dir, config_path, creationflags=NEW_CONSOLE):
-        self.label = label
-        self.app_dir = app_dir
-        self.config_path = config_path
-        self.creationflags = creationflags
-        self.process = None
-
-    def is_running(self):
-        return self.process is not None and self.process.poll() is None
-
-    def status(self):
-        if self.process is None:
-            return "stopped"
-        code = self.process.poll()
-        if code is None:
-            return "running"
-        return f"exited ({code})"
-
-    def start(self):
-        """Returns False when it was already running."""
-        if self.is_running():
-            return False
-        self.process = subprocess.Popen(
-            build_command(self.config_path),
-            cwd=self.app_dir,
-            creationflags=self.creationflags,
-        )
-        return True
-
-    def stop(self):
-        # terminate, the app's own shutdown needs someone typing in its console
-        if self.is_running():
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-        self.process = None
+from launcher.core import (  # noqa: E402
+    CLIENT_DATA_DIR, CLIENT_DIR, POLL_MS, SERVER_CONFIG, SERVER_DIR,
+    COLOR_EXITED, COLOR_RUNNING, COLOR_STOPPED, App, ensure_default_configs, head_start_ms, list_client_configs,
+)
 
 
 class LauncherWindow:
@@ -289,6 +162,8 @@ class LauncherWindow:
 
 
 def main():
+    # a fresh checkout has only the example configs, which are in git
+    ensure_default_configs()
     root = tk.Tk()
     LauncherWindow(root)
     root.mainloop()
