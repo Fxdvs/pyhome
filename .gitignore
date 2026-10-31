@@ -8,6 +8,14 @@ server/**/clients.json.imported
 server/**/pyhome.db*
 server/**/pyhome-backup-*.db
 
+# real configs hold the token; only the examples they are made from are in git
+server/data/config.json
+client/data/*.json
+!client/data/*.example.json
+
+# what the launcher remembers between starts
+launcher/state.json
+
 # keys must never be committed, and a house's ca.crt is not the project's
 **/certs/
 

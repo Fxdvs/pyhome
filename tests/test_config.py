@@ -177,3 +177,38 @@ def test_argv_config_missing_file_exits(tmp):
     except SystemExit:
         return
     raise AssertionError("expected SystemExit")
+
+
+def test_default_config_made_from_example(tmp, capsys):
+    data_dir = os.path.join(tmp, "data")
+    os.makedirs(data_dir)
+    write_json(os.path.join(data_dir, "config.example.json"), {"ID": "", "NAME": "Example", "TOKEN": ""})
+    config.init(tmp)
+    path = os.path.join(data_dir, "config.json")
+    assert read_json(path)["NAME"] == "Example"
+    assert "from config.example.json" in capsys.readouterr().out
+
+
+def test_existing_config_not_overwritten_by_example(tmp):
+    data_dir = os.path.join(tmp, "data")
+    os.makedirs(data_dir)
+    write_json(os.path.join(data_dir, "config.example.json"), {"NAME": "Example"})
+    write_json(os.path.join(data_dir, "config.json"), {"NAME": "Mine"})
+    config.init(tmp)
+    assert read_json(os.path.join(data_dir, "config.json"))["NAME"] == "Mine"
+
+
+def test_config_option_not_made_from_example(tmp):
+    data_dir = os.path.join(tmp, "data")
+    os.makedirs(data_dir)
+    write_json(os.path.join(data_dir, "config.example.json"), {"NAME": "Example"})
+    path = os.path.join(data_dir, "kitchen.json")
+    config.init(tmp, path)
+    assert not os.path.exists(path)
+
+
+def test_repo_ships_examples_not_configs():
+    root = os.path.dirname(TESTS_DIR)
+    for side in ("server", "client"):
+        example = read_json(os.path.join(root, side, "data", "config.example.json"))
+        assert example.get("TOKEN", "") == "", f"{side} example must not carry a token"

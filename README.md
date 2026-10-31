@@ -79,10 +79,32 @@ Several commands can be in flight at once: each `cmd` carries a
 py -m pip install -r requirements.txt
 ```
 
+## Configs and the token
+
+The real configs are not in git: they hold the token. Git has
+`server/data/config.example.json` and `client/data/config.example.json`, the
+defaults with an empty token. When `data/config.json` is missing, the app (and
+the launcher) copies the example to it on start and says so in one line. Edit
+`config.json`, never the example; `git status` never shows it.
+
+**Updating from v1.3 or older.** Git deletes `config.json` from the folder when
+a pulled commit stops tracking it, so copy them aside first:
+
+```
+copy server\data\config.json server\data\config.mine.json
+copy client\data\config.json client\data\config.mine.json
+git pull
+move server\data\config.mine.json server\data\config.json
+move client\data\config.mine.json client\data\config.json
+```
+
+Configs that were never committed, such as `client/data/kuchyna-svetlo.json`,
+are not touched by the pull.
+
 ## Running
 
 On Windows, double click `launcher.pyw`. It lists the server and every client
-config in `client/data/`. Tick what you want and press **Run**. Every app opens
+config in `client/data/` (the `*.example.json` templates excepted). Tick what you want and press **Run**. Every app opens
 in its own console, the launcher shows which are running and stops them one by
 one or all at once. Stopping ends the process, the server sees that as an
 ordinary dropped connection.
@@ -106,7 +128,7 @@ A new config file only needs `NAME`, the network settings and, for a device, `DE
 takes it from the file name (`kuchyna-svetlo.json` becomes `kuchyna-svetlo`)
 and writes it back into the file. A file name that is not a usable id, and
 `config.json`, get 8 random hex characters instead. So the quickest new device
-is: copy a config to `<room>-<device>.json` and empty its `ID`. The launcher
+is: copy `config.example.json` to `<room>-<device>.json` and fill it in. The launcher
 refuses configs that share an ID.
 
 To keep strangers out, put the same `TOKEN` in the server's config and in every
@@ -123,8 +145,9 @@ py -c "import secrets; print(secrets.token_urlsafe(16))"
 
 Upgrade every client before setting `TOKEN` on the server: an older client does
 not understand `denied` and keeps retrying instead of showing the reason.
-`client/data/config.json` and `server/data/config.json` are tracked in git, so a
-real token put there shows up in `git diff`. Keep real tokens out of commits.
+Every `*.json` in `client/data/` and `server/data/config.json` is ignored by
+git, so a token put there stays on your computer. Keep it out of the
+`*.example.json` files, which are in git.
 
 The server listens on TCP port `50000` for clients and prints the dashboard
 address on startup, including the one other devices on the network can use:
@@ -164,7 +187,8 @@ pyhome/
 │   ├── app.py                    entry point, runs all handlers with asyncio.gather
 │   ├── make_certs.py             makes the TLS authority and server certificate
 │   ├── data/
-│   │   ├── config.json           server identity and network settings
+│   │   ├── config.example.json   the template config.json is made from, in git
+│   │   ├── config.json           server identity and network settings, not in git
 │   │   ├── certs/                TLS files from make_certs.py, not in git
 │   │   └── pyhome.db             the server's database, created at runtime, not in git
 │   ├── web/index.html            dashboard page, renders itself from /api/clients
@@ -177,7 +201,8 @@ pyhome/
 ├── client/
 │   ├── app.py                    entry point
 │   ├── devices/                  one package per kind of device (light, thermostat)
-│   ├── data/config.json          client identity and which server to reach
+│   ├── data/config.example.json  the template config.json is made from, in git
+│   ├── data/*.json               client identity and which server to reach, not in git
 │   └── client_handlers/          named apart from the server's handlers, so pytest can import both
 │       ├── connection_handler.py connects and reconnects, holds the socket
 │       ├── message_handler.py    receives messages from the server
