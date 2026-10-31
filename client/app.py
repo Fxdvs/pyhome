@@ -17,7 +17,7 @@ from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
 from shared.symbols import WARNING  # noqa: E402
 from client_handlers.device_handler import get_capabilities, load_device  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
-from shared.command_handler import command_handler_async  # noqa: E402
+from shared.command_handler import ShutdownRequested, command_handler_async  # noqa: E402
 from client_handlers.connection_handler import connect_to_server_async, tls_warning  # noqa: E402
 from client_handlers.message_handler import receive_messages_async  # noqa: E402
 
@@ -75,6 +75,9 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print(f"\n{NAME} is shutting down.")
+    except ShutdownRequested as e:
+        # the shutdown command, already said goodbye
+        sys.exit(e.code)
     except SystemExit as e:
         # sys.exit(1) etc reaches here too (uvicorn uses it on a bind failure);
         # a clean shutdown (exit(0)) must close without a prompt

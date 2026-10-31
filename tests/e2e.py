@@ -97,12 +97,12 @@ class System:
         }, stdin=subprocess.PIPE)
         wait_for(lambda: self.api() is not None, "the dashboard to answer")
 
-    def start_client(self, client_id, device=None, **extra):
-        self.start(client_id, CLIENT_DIR, {
+    def start_client(self, client_id, device=None, stdin=subprocess.DEVNULL, **extra):
+        return self.start(client_id, CLIENT_DIR, {
             "ID": client_id, "NAME": client_id.title(), "TYPE": "client", "VERSION": "test",
             "HOST": "127.0.0.1", "PORT": self.port, "DEVICE": device,
             **extra,
-        })
+        }, stdin=stdin)
 
     def url(self, path):
         return f"{self.scheme}://127.0.0.1:{self.web_port}{path}"
