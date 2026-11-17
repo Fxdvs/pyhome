@@ -21,3 +21,6 @@ launcher/state.json
 
 # pytest
 .pytest_cache/
+
+# the data folder docker-compose.yml mounts into the server container
+server-data/

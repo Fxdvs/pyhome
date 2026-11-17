@@ -1,0 +1,25 @@
+# The pyhome server in a container. Start it with: docker compose up -d --build
+# Its data (config.json, certs, pyhome.db, backups) is in ./server-data. See docs/docker.md.
+services:
+  server:
+    build: .
+    container_name: pyhome
+    # a fixed name, so a certificate made inside names pyhome and pyhome.local, not a random id
+    hostname: pyhome
+    restart: unless-stopped
+    ports:
+      # a port changed in server-data/config.json must be changed here too
+      - "50000:50000"        # clients
+      - "50001:50001"        # dashboard
+      - "50002:50002/udp"    # Hľadať servery in the launcher
+    volumes:
+      - ./server-data:/data
+    environment:
+      # times in the console and on the dashboard, in this zone
+      TZ: Europe/Bratislava
+      # the address the house reaches this computer by, for the dashboard line and certificates
+      # PYHOME_ADDRESS: 192.168.1.20
+    # a terminal, so docker attach pyhome is the server's console (leave with Ctrl+P Ctrl+Q)
+    stdin_open: true
+    tty: true
+    stop_grace_period: 15s

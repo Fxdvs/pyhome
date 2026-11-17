@@ -1,0 +1,10 @@
+# Linux only (a Raspberry Pi, a NAS): the server on the house's network itself, so
+# Hľadať servery finds it from every computer and its printed addresses are right.
+#   docker compose -f docker-compose.yml -f docker-compose.host.yml up -d --build
+services:
+  server:
+    network_mode: host
+    # docker refuses a hostname of its own on the host's network; the host's name is used
+    hostname: !reset null
+    # with the host's network there is nothing to publish
+    ports: !reset []

@@ -1,0 +1,11 @@
+# The image gets the server and nothing else: never a config with its token,
+# a database or a key. Everything is left out, then the server let back in.
+*
+!requirements.txt
+!shared/
+!server/
+server/data/*
+!server/data/config.example.json
+server/*.bat
+**/__pycache__
+**/*.pyc
