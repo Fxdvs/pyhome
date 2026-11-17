@@ -12,10 +12,10 @@ sys.path.insert(0, ROOT_DIR)
 # config has to know which file is ours before anything reads it,
 # --config picks another one so several instances can run from one folder
 from shared import config  # noqa: E402
-config.init(APP_DIR, config.config_file_from_argv(sys.argv))
+config.init(APP_DIR, config.config_file_from_argv(sys.argv), config.data_dir_from_env())
 
 from shared.colors import GREEN, RED, RESET, YELLOW  # noqa: E402
-from shared.config import get_config  # noqa: E402
+from shared.config import get_config, public_address  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import ShutdownRequested, command_handler_async  # noqa: E402
 from shared.network import check_port_free, get_local_ip, is_address_in_use, port_in_use_message  # noqa: E402
@@ -72,9 +72,11 @@ def print_web_url():
 
     print(f"{label}{GREEN}{scheme}://localhost:{port}{RESET}")
 
-    # 0.0.0.0 means every interface, so show the address other devices can use
+    # 0.0.0.0 means every interface, so show the address other devices can use;
+    # in a container only PYHOME_ADDRESS knows it, the server sees the container's own
     if host == "0.0.0.0":
-        print(f"{' ' * len(label)}{GREEN}{scheme}://{get_local_ip()}:{port}{RESET}")
+        address = public_address() or get_local_ip()
+        print(f"{' ' * len(label)}{GREEN}{scheme}://{address}:{port}{RESET}")
 
     # what a phone shows when installing ca.crt, compare before trusting it
     ca = ca_file()

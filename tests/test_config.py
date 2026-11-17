@@ -212,3 +212,45 @@ def test_repo_ships_examples_not_configs():
     for side in ("server", "client"):
         example = read_json(os.path.join(root, side, "data", "config.example.json"))
         assert example.get("TOKEN", "") == "", f"{side} example must not carry a token"
+
+
+def test_data_dir_moves_the_default_config(tmp):
+    # the server's PYHOME_DATA: an empty folder gets a config from the app's own example
+    app_dir = os.path.join(tmp, "app")
+    os.makedirs(os.path.join(app_dir, "data"))
+    write_json(os.path.join(app_dir, "data", "config.example.json"), {"NAME": "Example", "TOKEN": ""})
+    data_dir = os.path.join(tmp, "volume", "data")
+    config.init(app_dir, None, data_dir)
+    assert config.get_config_path() == os.path.join(data_dir, "config.json")
+    assert read_json(os.path.join(data_dir, "config.json"))["NAME"] == "Example"
+    assert not os.path.exists(os.path.join(app_dir, "data", "config.json")), "the checkout is not touched"
+
+
+def test_data_dir_keeps_an_existing_config(tmp):
+    app_dir = os.path.join(tmp, "app")
+    os.makedirs(os.path.join(app_dir, "data"))
+    write_json(os.path.join(app_dir, "data", "config.example.json"), {"NAME": "Example"})
+    data_dir = os.path.join(tmp, "volume")
+    os.makedirs(data_dir)
+    write_json(os.path.join(data_dir, "config.json"), {"NAME": "Mine"})
+    config.init(app_dir, None, data_dir)
+    assert read_json(os.path.join(data_dir, "config.json"))["NAME"] == "Mine"
+
+
+def test_config_option_wins_over_data_dir(tmp):
+    path = os.path.join(tmp, "kitchen.json")
+    write_json(path, {"NAME": "Kitchen"})
+    config.init(tmp, path, os.path.join(tmp, "volume"))
+    assert config.get_config_path() == path
+    assert not os.path.exists(os.path.join(tmp, "volume"))
+
+
+def test_environment_variables(monkeypatch):
+    monkeypatch.delenv("PYHOME_DATA", raising=False)
+    monkeypatch.delenv("PYHOME_ADDRESS", raising=False)
+    assert config.data_dir_from_env() is None and config.public_address() is None
+    monkeypatch.setenv("PYHOME_DATA", "/data")
+    monkeypatch.setenv("PYHOME_ADDRESS", " 192.168.1.20 ")
+    assert config.data_dir_from_env() == "/data" and config.public_address() == "192.168.1.20"
+    monkeypatch.setenv("PYHOME_ADDRESS", "")
+    assert config.public_address() is None

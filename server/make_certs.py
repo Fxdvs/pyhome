@@ -22,10 +22,11 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(APP_DIR)
 sys.path.insert(0, ROOT_DIR)
 
+from shared.config import data_dir_from_env, public_address  # noqa: E402
 from shared.network import get_local_ip  # noqa: E402
 
-# the config's folder, TLS_CERT and TLS_KEY are written relative to it
-DATA_DIR = os.path.join(APP_DIR, "data")
+# the config's folder, TLS_CERT and TLS_KEY are written relative to it; PYHOME_DATA in a container
+DATA_DIR = os.path.abspath(data_dir_from_env() or os.path.join(APP_DIR, "data"))
 CERTS_DIR = os.path.join(DATA_DIR, "certs")
 
 CA_DAYS = 3650
@@ -51,6 +52,9 @@ def default_hosts():
     if hostname:
         hosts += [hostname, f"{hostname}.local"]
     hosts.append(get_local_ip())
+    # in a container the address above is the container's; the house uses this one
+    if public_address():
+        hosts.append(public_address())
     return hosts
 
 

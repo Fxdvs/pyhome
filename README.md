@@ -275,6 +275,14 @@ Both sides read `data/config.json`, or the file given with `--config`:
 | `DISCOVERY_PORT` | server only, the UDP port it answers on, `50002` by default. The launcher asks on the one in this checkout's server config |
 | `TLS_CA` | client only, the authority certificate to trust, relative to the config's folder. Empty for none |
 
+Two environment variables matter where the server cannot see its own
+surroundings, as in a container:
+
+| Variable | Description |
+| --- | --- |
+| `PYHOME_DATA` | the server's data folder: its config is `$PYHOME_DATA/config.json`, made from the example when missing, and its database, certificates and backups live next to it. `--config` still wins |
+| `PYHOME_ADDRESS` | the address the house reaches this computer by (`192.168.1.20`, `dom.lan`). Printed for the dashboard in place of the server's own, and added to a certificate `make_certs.py` makes |
+
 The server can rename itself at runtime with `data config edit name`.
 
 ### Data folder

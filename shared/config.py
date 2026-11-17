@@ -23,17 +23,26 @@ ID_PATTERN = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 RESERVED_IDS = {"all"}
 
 
-def init(app_dir, config_file=None):
+# the server's data folder from outside the checkout, as a container mounts it
+DATA_ENV = "PYHOME_DATA"
+# the address the house reaches this computer by, where the server cannot see it (a container)
+ADDRESS_ENV = "PYHOME_ADDRESS"
+
+
+def init(app_dir, config_file=None, data_dir=None):
     """Point the module at the config file. Called from app.py.
 
-    config_file overrides the default <app_dir>/data/config.json. The default
-    is made from config.example.json when it is missing, so a fresh checkout
-    starts: the real config holds the token and is not in git.
+    config_file overrides the default <app_dir>/data/config.json, and
+    data_dir (the server's PYHOME_DATA) moves that default to
+    <data_dir>/config.json. The default is made from the app's own
+    config.example.json when it is missing, so a fresh checkout or an empty
+    data folder starts: the real config holds the token and is not in git.
     """
     global _config_path, _config_cache
     if config_file is None:
-        config_file = os.path.join(app_dir, "data", "config.json")
-        copy_example(config_file)
+        folder = os.path.abspath(data_dir) if data_dir else os.path.join(app_dir, "data")
+        config_file = os.path.join(folder, "config.json")
+        copy_example(config_file, os.path.join(app_dir, "data", "config.example.json"))
     _config_path = config_file
     _config_cache = None
 
@@ -43,14 +52,25 @@ def example_for(path):
     return os.path.join(os.path.dirname(path), "config.example.json")
 
 
-def copy_example(path):
-    """Make path from its example when it does not exist yet. True when it did."""
-    example = example_for(path)
+def copy_example(path, example=None):
+    """Make path from example (config.example.json next to it) when path does not exist yet. True when it did."""
+    example = example or example_for(path)
     if os.path.exists(path) or not os.path.exists(example):
         return False
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     shutil.copyfile(example, path)
     print(f"Created {path} from config.example.json")
     return True
+
+
+def data_dir_from_env():
+    """PYHOME_DATA, or None when it is not set."""
+    return os.environ.get(DATA_ENV) or None
+
+
+def public_address():
+    """PYHOME_ADDRESS, or None when it is not set."""
+    return os.environ.get(ADDRESS_ENV, "").strip() or None
 
 
 def config_file_from_argv(argv):
