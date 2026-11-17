@@ -65,3 +65,27 @@ def test_wait_for_enter_does_not_wait_without_a_terminal(monkeypatch):
     monkeypatch.setattr(console, "interactive", lambda: False)
     monkeypatch.setattr("builtins.input", no_input)
     console.wait_for_enter()
+
+
+def test_read_line_off_the_loop_in_a_daemon_thread(monkeypatch):
+    import asyncio
+    import threading
+    seen = {}
+
+    def fake_input(text):
+        seen["thread"] = threading.current_thread()
+        return "list"
+    monkeypatch.setattr("builtins.input", fake_input)
+    assert asyncio.run(console.read_line("> ")) == "list"
+    # a daemon thread: an exit never waits for a line that does not come
+    assert seen["thread"].daemon and seen["thread"] is not threading.main_thread()
+
+
+def test_read_line_passes_end_of_input_on(monkeypatch):
+    import asyncio
+
+    def closed(text):
+        raise EOFError
+    monkeypatch.setattr("builtins.input", closed)
+    with pytest.raises(EOFError):
+        asyncio.run(console.read_line())

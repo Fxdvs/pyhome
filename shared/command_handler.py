@@ -14,7 +14,7 @@ import inspect
 import os
 import asyncio
 
-from shared.console import prompt
+from shared.console import prompt, read_line
 from shared.symbols import ERROR
 
 _commands = {}
@@ -100,7 +100,7 @@ async def command_handler_async(sources):
     while True:
         try:
             # input blocks, so it runs off the event loop
-            cmd_input = await loop.run_in_executor(None, input, prompt())
+            cmd_input = await read_line(prompt())
             cmd_input = cmd_input.strip()
 
             if not cmd_input:

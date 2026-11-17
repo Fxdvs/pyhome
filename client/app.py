@@ -76,8 +76,12 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(f"\n{NAME} is shutting down.")
     except ShutdownRequested as e:
-        # the shutdown command, already said goodbye
-        sys.exit(e.code)
+        # the shutdown command or SIGTERM, everything is closed and said goodbye.
+        # Exit at once: a console thread may still wait for a line, and Python's
+        # own exit would abort on the stdin it holds.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(e.code or 0)
     except SystemExit as e:
         # sys.exit(1) etc reaches here too (uvicorn uses it on a bind failure);
         # a clean shutdown (exit(0)) must close without a prompt

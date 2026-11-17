@@ -57,13 +57,39 @@ def print_message(message: str):
         sys.stdout.flush()
 
 
-async def ask(prompt):
-    """input() for an async command, off the event loop.
+async def read_line(text=""):
+    """input() off the event loop, in a thread the app does not wait for when it exits.
 
     input() blocks; called straight from a coroutine it would stop the whole
-    server, clients and dashboard included, until someone answers.
+    server, clients and dashboard included. In the loop's own thread pool it
+    would hold the exit instead: Python joins those threads, and one waiting
+    for a line that never comes (docker stop, the launcher's Stop) never ends.
     """
-    return await asyncio.get_running_loop().run_in_executor(None, input, prompt)
+    loop = asyncio.get_running_loop()
+    answer = loop.create_future()
+
+    def deliver(setter, value):
+        if not answer.done():
+            setter(value)
+
+    def read():
+        try:
+            value, setter = input(text), answer.set_result
+        except BaseException as e:  # EOFError, KeyboardInterrupt, a closed stdin
+            value, setter = e, answer.set_exception
+        try:
+            loop.call_soon_threadsafe(deliver, setter, value)
+        except RuntimeError:
+            # the loop is gone, the app is ending
+            pass
+
+    threading.Thread(target=read, name="console input", daemon=True).start()
+    return await answer
+
+
+async def ask(prompt):
+    """input() for an async command, off the event loop."""
+    return await read_line(prompt)
 
 
 def wait_for_enter():

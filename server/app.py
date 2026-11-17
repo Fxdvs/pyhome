@@ -1,5 +1,6 @@
 import os
 import sys
+import signal
 import asyncio
 import uvicorn
 
@@ -13,7 +14,7 @@ sys.path.insert(0, ROOT_DIR)
 from shared import config  # noqa: E402
 config.init(APP_DIR, config.config_file_from_argv(sys.argv))
 
-from shared.colors import GREEN, RESET, YELLOW  # noqa: E402
+from shared.colors import GREEN, RED, RESET, YELLOW  # noqa: E402
 from shared.config import get_config  # noqa: E402
 from shared.console import wait_for_enter  # noqa: E402
 from shared.command_handler import ShutdownRequested, command_handler_async  # noqa: E402
@@ -136,7 +137,29 @@ async def open_discovery():
     print(f"Discovery answering on UDP port {port}, Find servers in the launcher sees this server")
     return transport
 
+def sigterm_event():
+    """An Event set by SIGTERM, which is how docker stop asks. None where asyncio has no signals (windows).
+
+    Installed before uvicorn starts: uvicorn catches SIGTERM itself while it
+    serves, then hands it on to the handler that was there before, this one.
+    """
+    stop = asyncio.Event()
+    try:
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, stop.set)
+    except (NotImplementedError, AttributeError):
+        return None
+    return stop
+
+async def stop_on_sigterm(stop):
+    """SIGTERM ends the server the way the shutdown command does."""
+    if stop is None:
+        return
+    await stop.wait()
+    print(f"{RED}{NAME}#{ID}{RESET} is shutting down (SIGTERM).")
+    raise ShutdownRequested(0)
+
 async def main():
+    stop = sigterm_event()
     check_ports()
     open_database()
     server = await start_server_async()
@@ -152,7 +175,8 @@ async def main():
             accept_clients(server),
             web_task,
             prune_daily(),
-            command_handler_async(COMMAND_SOURCES)
+            command_handler_async(COMMAND_SOURCES),
+            stop_on_sigterm(stop),
         )
     except ShutdownRequested:
         # uvicorn's own way out: it finishes and stops, where a cancel would print a traceback
@@ -186,8 +210,12 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(f"\n{NAME} is turned off.")
     except ShutdownRequested as e:
-        # the shutdown command, already said goodbye
-        sys.exit(e.code)
+        # the shutdown command or SIGTERM, everything is closed and said goodbye.
+        # Exit at once: a console thread may still wait for a line, and Python's
+        # own exit would abort on the stdin it holds.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(e.code or 0)
     except SystemExit as e:
         # sys.exit(1) etc reaches here too (uvicorn uses it on a bind failure);
         # a clean shutdown (exit(0)) must close without a prompt
