@@ -137,6 +137,16 @@ excepted):
 - What is ticked and selected is remembered in `launcher/state.json`. Closing
   the window while apps run asks first.
 
+**The server in Docker** runs on its own, starts again after a reboot and
+keeps its data in `server-data/`:
+
+```
+docker compose up -d --build
+```
+
+[docs/docker.md](docs/docker.md) takes it from installing Docker to TLS,
+backups, moving an existing server and the launcher.
+
 Or start them separately, each in its own console:
 
 ```

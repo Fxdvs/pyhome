@@ -24,3 +24,5 @@ launcher/state.json
 
 # the data folder docker-compose.yml mounts into the server container
 server-data/
+# the settings docker-compose.yml reads: PYHOME_ADDRESS, TZ
+.env

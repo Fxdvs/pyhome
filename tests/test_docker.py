@@ -133,11 +133,11 @@ def test_compose_files():
     compose = read("docker-compose.yml")
     for line in ('"50000:50000"', '"50001:50001"', '"50002:50002/udp"', "./server-data:/data",
                  "restart: unless-stopped", "stdin_open: true", "tty: true", "stop_grace_period: 15s",
-                 "hostname: pyhome", "TZ: Europe/Bratislava"):
+                 "hostname: pyhome", "TZ: ${TZ:-Europe/Bratislava}", "PYHOME_ADDRESS: ${PYHOME_ADDRESS:-}"):
         assert line in compose, line
     host = read("docker-compose.host.yml")
     assert "network_mode: host" in host and "ports: !reset []" in host and "hostname: !reset null" in host
-    assert "server-data/" in read(".gitignore").splitlines()
+    assert "server-data/" in read(".gitignore").splitlines() and ".env" in read(".gitignore").splitlines()
 
 
 def healthcheck(data_dir):

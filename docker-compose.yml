@@ -14,11 +14,13 @@ services:
       - "50002:50002/udp"    # Hľadať servery in the launcher
     volumes:
       - ./server-data:/data
+    # both can be set in a file .env next to this one, which git ignores:
+    #   PYHOME_ADDRESS=192.168.1.20
     environment:
       # times in the console and on the dashboard, in this zone
-      TZ: Europe/Bratislava
+      TZ: ${TZ:-Europe/Bratislava}
       # the address the house reaches this computer by, for the dashboard line and certificates
-      # PYHOME_ADDRESS: 192.168.1.20
+      PYHOME_ADDRESS: ${PYHOME_ADDRESS:-}
     # a terminal, so docker attach pyhome is the server's console (leave with Ctrl+P Ctrl+Q)
     stdin_open: true
     tty: true
