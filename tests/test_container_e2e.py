@@ -84,3 +84,16 @@ def test_make_certs_follows_pyhome_data_and_address(tmp):
         cert = x509.load_pem_x509_certificate(f.read())
     names = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
     assert "dom.lan" in names
+
+
+@posix_only
+def test_ctrl_c_ends_the_server_with_its_console_open(tmp):
+    def scenario(system):
+        system.start_server()
+        # Ctrl+C at an attached terminal: SIGINT while the console waits for a line
+        system.server.send_signal(signal.SIGINT)
+        assert system.server.wait(timeout=10) == 0
+        assert "is turned off" in system.log("server")
+        assert not os.path.exists(os.path.join(system.tmp, "pyhome.db-wal")), "the store was closed"
+
+    with_system(tmp, scenario)

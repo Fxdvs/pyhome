@@ -75,6 +75,11 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print(f"\n{NAME} is shutting down.")
+        # the store is closed by now (main's finally); leave at once, as after shutdown:
+        # Python's own exit would hang on the console thread waiting for a line
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
     except ShutdownRequested as e:
         # the shutdown command or SIGTERM, everything is closed and said goodbye.
         # Exit at once: a console thread may still wait for a line, and Python's
