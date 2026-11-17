@@ -717,7 +717,7 @@ code is written, the way [docs/v1.0-spec.md](docs/v1.0-spec.md),
 | Version | Theme | Contents |
 | --- | --- | --- |
 | 1.4.1 | A new look for the launcher | The design made in Claude Design, carried into the theme tokens and the page; no change to what the launcher does |
-| 1.5 | Server in a container | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one volume, a guide |
+| 1.5 | Server in a container ([spec](docs/v1.5-spec.md)) | A `Dockerfile` and `docker-compose.yml` for the server, its data folder as one mounted folder, a clean stop on `SIGTERM`, host networking for discovery on Linux, a guide and a CI job that builds and runs the image |
 
 Everything that is possible but not planned yet:
 
