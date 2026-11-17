@@ -35,3 +35,27 @@ jobs:
       - name: Run the tests
         # -ra lists skipped tests with the reason, so a missing tkinter is visible
         run: python -m pytest -v -ra
+
+  docker:
+    # the server's image, built and run under docker compose; linux containers need a linux runner
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Build and run the image
+        env:
+          PYHOME_DOCKER_TESTS: "1"
+        run: python -m pytest -v -ra tests/test_docker_e2e.py

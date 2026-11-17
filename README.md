@@ -214,6 +214,7 @@ pyhome/
 ├── server/
 │   ├── app.py                    entry point, runs all handlers with asyncio.gather
 │   ├── make_certs.py             makes the TLS authority and server certificate
+│   ├── healthcheck.py            docker's health check: does the dashboard answer
 │   ├── data/
 │   │   ├── config.example.json   the template config.json is made from, in git
 │   │   ├── config.json           server identity and network settings, not in git
@@ -237,6 +238,9 @@ pyhome/
 │       ├── message_handler.py    receives messages from the server
 │       ├── device_handler.py     loads the device and runs its actions
 │       └── commands/             client only commands
+├── Dockerfile                    the server's image, see docs/docker.md
+├── docker-compose.yml            runs it, its data in ./server-data, not in git
+├── docker-compose.host.yml       linux only: the host's network, for Hľadať servery from every computer
 ├── tests/                        pytest, run all with py -m pytest
 ├── .github/workflows/tests.yml   CI: the tests on Linux and Windows, Python 3.10 and 3.13
 ├── launcher/                     the desktop launcher
@@ -650,8 +654,10 @@ free ports and from temp configs, so they never touch `server/data/`. They
 are marked `e2e`. Every test gets `tmp`, a fresh temporary folder.
 
 GitHub Actions runs the whole suite on every push and pull request, on
-Ubuntu and Windows with Python 3.10 and 3.13
-([.github/workflows/tests.yml](.github/workflows/tests.yml)). The launcher is
+Ubuntu and Windows with Python 3.10 and 3.13, and a job `docker` that builds
+the server's image and runs it under `docker compose`
+(`tests/test_docker_e2e.py`, locally with `PYHOME_DOCKER_TESTS=1`); both are
+in [.github/workflows/tests.yml](.github/workflows/tests.yml). The launcher is
 tested below its window (`launcher/api.py` and down); pywebview itself is not
 started in CI.
 
